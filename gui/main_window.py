@@ -869,7 +869,7 @@ def create_gui():
 
     footer_frame = tk.Frame(root)
     footer_frame.grid(row=14, column=0, columnspan=5, sticky="ew", padx=20, pady=(5, 5))
-    footer_text = "Version 1.2 • January 2026 • Created by Chip"
+    footer_text = "Version 1.3 • January 2026 • Created by Chip"
     tk.Label(footer_frame, text=footer_text, font=("Helvetica", 9), fg="#666666", justify="center").pack(fill="x")
 
     root.mainloop()

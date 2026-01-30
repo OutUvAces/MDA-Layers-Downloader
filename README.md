@@ -1,5 +1,7 @@
 # MDA Layers Downloader
 
+**Version 1.3**
+
 A comprehensive Python application for downloading and processing marine geospatial data layers. This tool provides both a user-friendly GUI interface and supports batch processing of marine data for visualization in tools like Google Earth.
 
 ## 🌊 Features
