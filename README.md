@@ -68,7 +68,10 @@ The application integrates data from authoritative marine geospatial sources:
 
 ## 🚀 Usage
 
-### GUI Mode (Recommended)
+### Windows Executable (Recommended)
+Download the latest `MDA_Layers_Downloader_v1.3.exe` from the [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases) page. This standalone executable includes all dependencies and can run on Windows without Python installation.
+
+### GUI Mode (Python)
 Simply run `python main.py` to launch the graphical interface where you can:
 - Select which marine data layers to download
 - Configure colors, opacity, and density settings
