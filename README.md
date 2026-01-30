@@ -61,8 +61,16 @@ python main.py
 
 **Note:** Conda provides better compatibility with geospatial libraries and is recommended.
 
-### Portable Executable (Experimental)
-A portable executable is available for testing but may have compatibility issues with geospatial libraries. Download `MDA_Layers_Downloader_v1.3_portable.zip` from [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases) if you prefer not to install dependencies.
+### Single Executable (Recommended for End Users)
+For the easiest experience, download the single executable file that includes all dependencies:
+
+1. Download `MDA_Layers_SingleExe_v1.3.exe` from [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases)
+2. Run the executable directly - no installation required!
+
+**For Developers:** Use the build scripts (`create_single_exe.bat` or `create_single_exe.sh`) to create the executable using conda + PyInstaller.
+
+### Alternative: Install from Source
+See [INSTALL.md](INSTALL.md) for detailed installation instructions using conda or pip.
 
 ## 🚀 Usage
 

@@ -57,8 +57,29 @@ If you prefer pip over conda:
 
 **Note:** Pip installation may have issues with geospatial libraries on some systems. Conda is recommended for better compatibility.
 
-### Portable Executable (Experimental)
-A portable executable is available for testing but may have compatibility issues with geospatial libraries:
+### Single Executable (Recommended for Distribution)
+Create a single executable file that users can download and run without any installation:
+
+#### For Developers - Building the Executable
+1. Install [Miniconda](https://docs.conda.io/en/latest/miniconda.html) or Anaconda
+2. Run the build script:
+   ```bash
+   # On Windows
+   create_single_exe.bat
+
+   # On Linux/macOS
+   bash create_single_exe.sh  # (if created)
+   ```
+3. The script will create: `dist/MDA_Layers_SingleExe_v1.3.exe`
+4. Distribute this single file to users
+
+#### For Users - Running the Executable
+1. Download `MDA_Layers_SingleExe_v1.3.exe` from [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases)
+2. Double-click to run (Windows) or make executable and run (Linux/macOS)
+3. No installation or dependencies required!
+
+### Portable Directory (Alternative)
+A portable directory version is also available:
 
 1. Download `MDA_Layers_Downloader_v1.3_portable.zip` from [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases)
 2. Unzip the downloaded file
