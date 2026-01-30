@@ -151,7 +151,7 @@ MDA-Layers-Downloader/
 
 ## 📄 License
 
-This project is open source. Please check the license file for specific terms and conditions.
+This project is open source.
 
 ## 🙏 Acknowledgments
 
