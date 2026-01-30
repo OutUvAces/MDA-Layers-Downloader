@@ -1,8 +1,20 @@
+"""
+GUI controls and data loading utilities.
+
+This module provides functions for loading country data and other
+reference data used in the GUI components.
+"""
+
 import requests
 import json
 from core.config import COUNTRIES_JSON_URL
 
 def load_countries():
+    """Load country list from MarineRegions API.
+
+    Returns:
+        List of tuples containing (country_name, iso_code) for all countries.
+    """
     try:
         response = requests.get(COUNTRIES_JSON_URL, timeout=20)
         response.raise_for_status()

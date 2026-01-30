@@ -1,3 +1,10 @@
+"""
+Submarine cables data downloader and processor.
+
+This module handles downloading submarine cable data from Submarine Cable Map
+and converting it to KML format for visualization.
+"""
+
 import os
 import json
 import time
@@ -71,6 +78,19 @@ async def process_async(session, task: LayerTask, report_progress, output_dir: s
     return False
 
 def process(task: LayerTask, report_progress, output_dir: str, cache_dir: str) -> bool:
+    """Process submarine cables data.
+
+    Downloads submarine cable data from the configured URL and converts it to KML format.
+
+    Args:
+        task: Layer task configuration
+        report_progress: Progress reporting function
+        output_dir: Output directory for generated files
+        cache_dir: Cache directory for downloaded data
+
+    Returns:
+        True if processing successful, False otherwise
+    """
     temp_geojson = os.path.join(cache_dir, "cables.geojson")
     CACHE_TTL = 30 * 24 * 3600  # 30 days
 

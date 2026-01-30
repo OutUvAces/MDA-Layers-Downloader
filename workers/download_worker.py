@@ -1,3 +1,11 @@
+"""
+Download worker for processing marine data layers.
+
+This module coordinates the downloading and processing of various marine data layers
+including territorial waters, MPAs, submarine cables, ocean currents, and navigation warnings.
+It provides both synchronous and asynchronous processing capabilities.
+"""
+
 import os
 import json
 import asyncio
@@ -17,42 +25,11 @@ from downloaders.submarine_cables import process as process_cables, process_asyn
 from downloaders.oscar_currents import process as process_oscar, process_async as process_oscar_async
 from downloaders.navigation_warnings import process as process_navwarnings, process_async as process_navwarnings_async
 
-def worker(
-    settings: LayerSettings,
-    username: str | None,
-    password: str | None,
-    country_output_dir: str,
-    global_output_dir: str,
-    cache_dir: str,
-    iso_code: str,
-    country_name: str,
-    report_progress
-):
-    country_path = Path(country_output_dir)
-    global_path = Path(global_output_dir)
-    cache_path = Path(cache_dir)
-
-    # Create output folders
-    country_path.mkdir(exist_ok=True)
-    global_path.mkdir(exist_ok=True)
-
-    # Create _metadata subfolder in both output directories and hide it
-    for out_dir_str in [country_output_dir, global_output_dir]:
-        out_dir = Path(out_dir_str)
-        meta_dir = out_dir / "_metadata"
-        meta_dir.mkdir(exist_ok=True)
-        # Hide the folder on Windows
-        if os.name == 'nt':
-            try:
-                FILE_ATTRIBUTE_HIDDEN = 0x2
-                ctypes.windll.kernel32.SetFileAttributesW(str(meta_dir), FILE_ATTRIBUTE_HIDDEN)
-            except Exception as e:
-                report_progress(0, f"Warning: Could not hide _metadata folder in {out_dir}: {e}. "
-                                 "You can hide it manually: right-click folder → Properties → Hidden → Apply.")
-
+def build_tasks(settings: LayerSettings, country_path: Path, global_path: Path, iso_code: str) -> list[LayerTask]:
+    """Build list of LayerTask objects based on settings."""
     tasks = []
 
-    if settings.seastate_country:
+    if settings.seastate_country and not settings.eez:
         tasks.append(LayerTask(
             type="eez",
             name="Exclusive Economic Zone (auto for currents clip)",
@@ -140,6 +117,7 @@ def worker(
         ))
 
     # Create reverse density mapping from numerical values to text labels
+    from core.config import DENSITY_MAPPING
     DENSITY_REVERSE_MAPPING = {v: k for k, v in DENSITY_MAPPING.items()}
 
     if settings.seastate_country:
@@ -183,6 +161,59 @@ def worker(
             settings_color=settings.navwarnings_color,
             settings_opacity=settings.navwarnings_opacity
         ))
+
+    return tasks
+
+def worker(
+    settings: LayerSettings,
+    username: str | None,
+    password: str | None,
+    country_output_dir: str,
+    global_output_dir: str,
+    cache_dir: str,
+    iso_code: str,
+    country_name: str,
+    report_progress
+):
+    """Main synchronous worker function for processing marine data layers.
+
+    Processes all enabled marine data layers for a specific country or region,
+    coordinating downloads and conversions to KML format.
+
+    Args:
+        settings: Layer configuration settings
+        username: NASA Earthdata username (for OSCAR data)
+        password: NASA Earthdata password (for OSCAR data)
+        country_output_dir: Output directory for country-specific layers
+        global_output_dir: Output directory for global layers
+        cache_dir: Cache directory for downloaded data
+        iso_code: ISO country code
+        country_name: Full country name
+        report_progress: Progress reporting callback function
+    """
+    country_path = Path(country_output_dir)
+    global_path = Path(global_output_dir)
+    cache_path = Path(cache_dir)
+
+    # Create output folders
+    country_path.mkdir(exist_ok=True)
+    global_path.mkdir(exist_ok=True)
+
+    # Create _metadata subfolder in both output directories and hide it
+    for out_dir_str in [country_output_dir, global_output_dir]:
+        out_dir = Path(out_dir_str)
+        meta_dir = out_dir / "_metadata"
+        meta_dir.mkdir(exist_ok=True)
+        # Hide the folder on Windows
+        if os.name == 'nt':
+            try:
+                FILE_ATTRIBUTE_HIDDEN = 0x2
+                ctypes.windll.kernel32.SetFileAttributesW(str(meta_dir), FILE_ATTRIBUTE_HIDDEN)
+            except Exception as e:
+                report_progress(0, f"Warning: Could not hide _metadata folder in {out_dir}: {e}. "
+                                 "You can hide it manually: right-click folder → Properties → Hidden → Apply.")
+
+    tasks = build_tasks(settings, country_path, global_path, iso_code)
 
     report_progress(0, f"Created {len(tasks)} tasks to process.")
 
@@ -338,140 +369,7 @@ async def worker_async(
                 report_progress(0, f"Warning: Could not hide _metadata folder in {out_dir}: {e}. "
                                  "You can hide it manually: right-click folder → Properties → Hidden → Apply.")
 
-    tasks = []
-
-    if settings.seastate_country:
-        tasks.append(LayerTask(
-            type="eez",
-            name="Exclusive Economic Zone (auto for currents clip)",
-            output_path=str(country_path / f"{iso_code}_eez.kml"),
-            color_abgr=hex_to_kml_abgr(settings.eez_color, int(settings.eez_opacity)),
-            weight=35.0,
-            url=f"{MARINEREGIONS_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature&typeName=MarineRegions:eez&outputFormat=KML&CQL_FILTER=iso_ter1='{iso_code}'",
-            settings_color=settings.eez_color,
-            settings_opacity=settings.eez_opacity
-        ))
-
-    if settings.territorial:
-        tasks.append(LayerTask(
-            type="territorial",
-            name="Territorial waters (12nm)",
-            output_path=str(country_path / f"{iso_code}_territorial_waters.kml"),
-            color_abgr=hex_to_kml_abgr(settings.territorial_color, int(settings.territorial_opacity)),
-            weight=30.0,
-            url=f"{MARINEREGIONS_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature&typeName=MarineRegions:eez_12nm&outputFormat=KML&CQL_FILTER=iso_ter1='{iso_code}'",
-            settings_color=settings.territorial_color,
-            settings_opacity=settings.territorial_opacity
-        ))
-
-    if settings.contiguous:
-        tasks.append(LayerTask(
-            type="contiguous",
-            name="Contiguous zone (24nm)",
-            output_path=str(country_path / f"{iso_code}_contiguous_zone.kml"),
-            color_abgr=hex_to_kml_abgr(settings.contiguous_color, int(settings.contiguous_opacity)),
-            weight=30.0,
-            url=f"{MARINEREGIONS_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature&typeName=MarineRegions:eez_24nm&outputFormat=KML&CQL_FILTER=iso_ter1='{iso_code}'",
-            settings_color=settings.contiguous_color,
-            settings_opacity=settings.contiguous_opacity
-        ))
-
-    if settings.eez:
-        tasks.append(LayerTask(
-            type="eez",
-            name="Exclusive Economic Zone (200 nm)",
-            output_path=str(country_path / f"{iso_code}_eez.kml"),
-            color_abgr=hex_to_kml_abgr(settings.eez_color, int(settings.eez_opacity)),
-            weight=35.0,
-            url=f"{MARINEREGIONS_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature&typeName=MarineRegions:eez&outputFormat=KML&CQL_FILTER=iso_ter1='{iso_code}'",
-            settings_color=settings.eez_color,
-            settings_opacity=settings.eez_opacity
-        ))
-
-    if settings.ecs:
-        tasks.append(LayerTask(
-            type="ecs",
-            name="Extended Continental Shelf",
-            output_path=str(country_path / f"{iso_code}_ecs.kml"),
-            color_abgr=hex_to_kml_abgr(settings.ecs_color, int(settings.ecs_opacity)),
-            weight=30.0,
-            url=f"{MARINEREGIONS_WFS_BASE}?service=WFS&version=1.1.0&request=GetFeature&typeName=MarineRegions:ecs&outputFormat=KML&CQL_FILTER=iso_ter1='{iso_code}'",
-            settings_color=settings.ecs_color,
-            settings_opacity=settings.ecs_opacity
-        ))
-
-    if settings.mpa:
-        tasks.append(LayerTask(
-            type="mpa",
-            name="Marine Protected Areas",
-            output_path=str(country_path / f"{iso_code}_mpas.kml"),
-            color_abgr=hex_to_kml_abgr(settings.mpa_color, int(settings.mpa_opacity)),
-            weight=140.0,
-            iso_code=iso_code,
-            settings_color=settings.mpa_color,
-            settings_opacity=settings.mpa_opacity
-        ))
-
-    if settings.cables:
-        tasks.append(LayerTask(
-            type="cables",
-            name="Global Submarine Cables",
-            output_path=str(global_path / "global_submarine_cables.kml"),
-            color_abgr="",  # not used for random
-            weight=50.0,
-            url=SUBMARINE_CABLES_URL,
-            use_random_colors=settings.cables_random,
-            user_color_hex=settings.cables_color,
-            user_opacity=settings.cables_opacity,
-            settings_color=settings.cables_color,
-            settings_opacity=settings.cables_opacity
-        ))
-
-    # Create reverse density mapping from numerical values to text labels
-    from core.config import DENSITY_MAPPING
-    DENSITY_REVERSE_MAPPING = {v: k for k, v in DENSITY_MAPPING.items()}
-
-    if settings.seastate_country:
-        country_density_label = DENSITY_REVERSE_MAPPING.get(settings.seastate_density_country, str(settings.seastate_density_country).replace('.', '-'))
-        tasks.append(LayerTask(
-            type="seastate",
-            name="Ocean Currents (clipped to EEZ)",
-            output_path=str(country_path / f"{iso_code}_ocean_currents_eez_{country_density_label}.kml"),
-            color_abgr=hex_to_kml_abgr(settings.seastate_color, int(settings.seastate_opacity)),
-            weight=120.0,
-            iso_code=iso_code,
-            density=settings.seastate_density_country,
-            clip_to_eez=True,
-            settings_color=settings.seastate_color,
-            settings_opacity=settings.seastate_opacity
-        ))
-
-    if settings.seastate_global:
-        global_density_label = DENSITY_REVERSE_MAPPING.get(settings.seastate_density_global, str(settings.seastate_density_global).replace('.', '-'))
-        tasks.append(LayerTask(
-            type="seastate",
-            name="Ocean Currents (global)",
-            output_path=str(global_path / f"ocean_currents_global_{global_density_label}.kml"),
-            color_abgr=hex_to_kml_abgr(settings.seastate_color, int(settings.seastate_opacity)),
-            weight=120.0,
-            iso_code=iso_code,
-            density=settings.seastate_density_global,
-            clip_to_eez=False,
-            settings_color=settings.seastate_color,
-            settings_opacity=settings.seastate_opacity
-        ))
-
-    if settings.navwarnings:
-        tasks.append(LayerTask(
-            type="navwarnings",
-            name="Global Maritime Navigation Warnings",
-            output_path=str(global_path / "navigation_warnings.kml"),
-            color_abgr=hex_to_kml_abgr(settings.navwarnings_color, int(settings.navwarnings_opacity)),
-            weight=50.0,
-            use_custom_colors=settings.navwarnings_custom,
-            settings_color=settings.navwarnings_color,
-            settings_opacity=settings.navwarnings_opacity
-        ))
+    tasks = build_tasks(settings, country_path, global_path, iso_code)
 
     report_progress(0, f"Created {len(tasks)} tasks to process concurrently!")
 

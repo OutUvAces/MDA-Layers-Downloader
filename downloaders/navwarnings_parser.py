@@ -81,7 +81,16 @@ def create_warning_description(warning: dict, category: str = None, feature_text
     msg_number = warning.get('msg_number', warning.get('msgNumber', 'Unknown'))
     msg_year = warning.get('msg_year', warning.get('msgYear', warning.get('year', 'Unknown')))
 
-    description = f"<b>NAVAREA:</b> {navarea}<br>"
+    navarea_names = {
+        'IV': 'NAVAREA IV (US Atlantic)',
+        'XII': 'NAVAREA XII (US Pacific)',
+        'HYDROLANT': 'HYDROLANT (Atlantic)',
+        'HYDROPAC': 'HYDROPAC (Indo-Pacific)',
+        'HYDROARC': 'HYDROARC (Arctic)'
+    }
+    navarea_display = navarea_names.get(navarea, f'NAVAREA {navarea}')
+
+    description = f"<b>NAVAREA:</b> {navarea_display}<br>"
     description += f"<b>Warning:</b> {msg_number}/{msg_year}<br>"
 
     # Add category information
@@ -108,8 +117,7 @@ def create_warning_description(warning: dict, category: str = None, feature_text
         desc_text = warning.get('description', warning.get('content', warning.get('text', 'No description available')))
     description += desc_text.replace('\n', '<br>')
     description += "<br><br>"
-
-    # Add coordinate information
+    return description
     if 'coordinates' in warning and warning['coordinates']:
         coords = warning['coordinates']
         if isinstance(coords, list) and coords:
@@ -405,7 +413,7 @@ def create_trackline_berth_polygon(coords: List[List[float]], berth_nm: float) -
                         [lat, lon + berth_deg_lon],
                         [lat, lon - berth_deg_lon]
                     ])
-                hull_points = _convex_hull(all_offset_points)
+                hull_points = all_offset_points[:]
                 if hull_points and hull_points[0] != hull_points[-1]:
                     hull_points.append(hull_points[0][:])
                 return hull_points
@@ -420,7 +428,7 @@ def create_trackline_berth_polygon(coords: List[List[float]], berth_nm: float) -
                     [lat, lon + berth_deg_lon],
                     [lat, lon - berth_deg_lon]
                 ])
-            hull_points = _convex_hull(all_offset_points)
+            hull_points = all_offset_points[:]
             if hull_points and hull_points[0] != hull_points[-1]:
                 hull_points.append(hull_points[0][:])
             return hull_points
@@ -926,7 +934,7 @@ def extract_sectioned_coordinates(text: str) -> List:
                 if depth_coords:
                     # Split into individual points
                     for i, coord in enumerate(depth_coords):
-                        results.append([f'DEPTH_POINT_{i+1}', [coord]])
+                        results.append([f'DEPTH_POINT_{chr(65 + i)}', [coord]])
             return results
 
     # Use the new robust component extraction to get features with proper text

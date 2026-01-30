@@ -1,3 +1,10 @@
+"""
+KML style processing utilities.
+
+This module contains functions for downloading, processing, and styling KML files
+used in the marine data visualization layers.
+"""
+
 import os
 import requests
 import xml.etree.ElementTree as ET
@@ -5,8 +12,21 @@ import geopandas as gpd
 from core.utils import hex_to_kml_abgr
 
 NS_KML = {'kml': 'http://www.opengis.net/kml/2.2'}
+"""KML namespace for XML parsing."""
 
 def download_kml(url: str, temp_kml: str) -> bool:
+    """Download KML file from URL to temporary location.
+
+    Downloads a KML file from the specified URL, disabling SSL verification
+    for compatibility with marine data servers that may have certificate issues.
+
+    Args:
+        url: URL to download the KML file from
+        temp_kml: Path to save the downloaded KML file
+
+    Returns:
+        True if download successful, False otherwise
+    """
     # Disable SSL verification for marine data downloads (certificate issues with some servers)
     try:
         import urllib3
@@ -20,6 +40,19 @@ def download_kml(url: str, temp_kml: str) -> bool:
         return False
 
 def process_kml(temp_kml: str, output_kml: str, fill_color: str) -> bool:
+    """Process and style a downloaded KML file.
+
+    Modifies the KML file to apply the specified fill color and other styling
+    for marine data visualization.
+
+    Args:
+        temp_kml: Path to the input KML file
+        output_kml: Path to save the processed KML file
+        fill_color: KML ABGR color code for fill styling
+
+    Returns:
+        True if processing successful, False otherwise
+    """
     ET.register_namespace('', 'http://www.opengis.net/kml/2.2')
     try:
         tree = ET.parse(temp_kml)
@@ -53,6 +86,21 @@ def process_kml(temp_kml: str, output_kml: str, fill_color: str) -> bool:
     return True
 
 def process_line_kml(temp_geojson: str, output_kml: str, user_color_hex: str, user_opacity: str, use_random: bool) -> bool:
+    """Process GeoJSON line data and convert to styled KML.
+
+    Converts GeoJSON line features to KML format with appropriate styling,
+    supporting both uniform and random color schemes.
+
+    Args:
+        temp_geojson: Path to the input GeoJSON file
+        output_kml: Path to save the output KML file
+        user_color_hex: Hex color code for uniform coloring
+        user_opacity: Opacity percentage for styling
+        use_random: Whether to use random colors for individual features
+
+    Returns:
+        True if processing successful, False otherwise
+    """
     try:
         gdf = gpd.read_file(temp_geojson)
         if gdf.empty:

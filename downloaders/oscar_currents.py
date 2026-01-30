@@ -1,3 +1,10 @@
+"""
+OSCAR ocean currents data downloader and processor.
+
+This module handles downloading OSCAR (Ocean Surface Current Analysis Real-time)
+data from NASA and converting it to KML format for visualization.
+"""
+
 import os
 import json
 import numpy as np
@@ -9,6 +16,7 @@ import cftime
 import ctypes
 import base64
 from datetime import datetime, timedelta
+import time
 
 from core.utils import add_data, hex_to_kml_abgr
 from core.types import LayerTask
@@ -145,22 +153,30 @@ def get_latest_oscar_nrt_granule_info() -> tuple[str, str]:
         "page_size": 1,
         "sort_key": "-start_date"
     }
-    response = requests.get(OSCAR_CMR_URL, params=params, timeout=30)
-    response.raise_for_status()
-    data = response.json()
-    if 'items' not in data or not data['items']:
-        raise Exception("No granules found")
-    granule = data['items'][0]['umm']
-    related_urls = granule['RelatedUrls']
-    download_url = None
-    for url_info in related_urls:
-        if url_info['Type'] in ("GET DATA", "DOWNLOAD", "USE SERVICE API"):
-            download_url = url_info['URL']
-            break
-    if not download_url:
-        raise Exception("No download URL found")
-    beginning_date = granule['TemporalExtent']['RangeDateTime']['BeginningDateTime'].split('T')[0]
-    return download_url, beginning_date
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = requests.get(OSCAR_CMR_URL, params=params, timeout=30)
+            response.raise_for_status()
+            data = response.json()
+            if 'items' not in data or not data['items']:
+                raise Exception("No granules found")
+            granule = data['items'][0]['umm']
+            related_urls = granule['RelatedUrls']
+            download_url = None
+            for url_info in related_urls:
+                if url_info['Type'] in ("GET DATA", "DOWNLOAD", "USE SERVICE API"):
+                    download_url = url_info['URL']
+                    break
+            if not download_url:
+                raise Exception("No download URL found")
+            beginning_date = granule['TemporalExtent']['RangeDateTime']['BeginningDateTime'].split('T')[0]
+            return download_url, beginning_date
+        except requests.exceptions.RequestException as e:
+            if attempt < max_retries - 1:
+                time.sleep(2 ** attempt)  # Exponential backoff: 1s, 2s, 4s
+                continue
+            raise Exception(f"CMR API failed after {max_retries} attempts: {e}")
 
 def get_earthdata_token(username: str, password: str) -> str:
     """Get Earthdata access token using OAuth2 user token flow."""
@@ -199,6 +215,7 @@ def get_earthdata_token(username: str, password: str) -> str:
 
 def process_oscar_core(task: LayerTask, report_progress, output_dir: str, cache_dir: str, temp_nc: str, time_str: str) -> bool:
     """Core OSCAR processing logic (shared between sync and async versions)"""
+    from shapely.geometry import Polygon, MultiPolygon
     try:
         ds = xr.open_dataset(temp_nc)
 
@@ -353,9 +370,16 @@ def process_oscar_core(task: LayerTask, report_progress, output_dir: str, cache_
                 all_coords = []
                 for geom in eez_gdf.geometry:
                     if geom is not None:
-                        coords = list(geom.exterior.coords) if geom.geom_type == 'Polygon' else []
-                        if geom.geom_type == 'MultiPolygon':
-                            coords = list(geom[0].exterior.coords)  # Use first polygon
+                        if geom.geom_type == 'Polygon':
+                            coords = list(geom.exterior.coords)
+                        elif geom.geom_type == 'MultiPolygon':
+                            for poly in geom.geoms:  # Iterate all polygons in MultiPolygon
+                                coords = list(poly.exterior.coords)
+                                all_coords.extend(coords)
+                                break  # Use first polygon for bounds (sufficient)
+                            continue
+                        else:
+                            continue
                         all_coords.extend(coords)
 
                 # Get EEZ bounds (fallback to bounding box if no coordinates)
@@ -371,10 +395,20 @@ def process_oscar_core(task: LayerTask, report_progress, output_dir: str, cache_
                 eez_gdf_360 = eez_gdf.copy()
                 for idx, geom in enumerate(eez_gdf_360.geometry):
                     if geom is not None:
-                        coords = list(geom.exterior.coords)
-                        new_coords = [(lon + 360 if lon < 0 else lon, lat) for lon, lat in coords]
-                        from shapely.geometry import Polygon
-                        eez_gdf_360.geometry.iloc[idx] = Polygon(new_coords)
+                        if geom.geom_type == 'Polygon':
+                            coords = list(geom.exterior.coords)
+                            new_coords = [(lon + 360 if lon < 0 else lon, lat) for lon, lat in coords]
+                            from shapely.geometry import Polygon
+                            eez_gdf_360.geometry.iloc[idx] = Polygon(new_coords)
+                        elif geom.geom_type == 'MultiPolygon':
+                            polys = []
+                            for poly in geom.geoms:
+                                coords = list(poly.exterior.coords)
+                                new_coords = [(lon + 360 if lon < 0 else lon, lat) for lon, lat in coords]
+                                polys.append(Polygon(new_coords))
+                            from shapely.geometry import MultiPolygon
+                            eez_gdf_360.geometry.iloc[idx] = MultiPolygon(polys)
+                        # Skip other types
 
                 # Create mask: True for points inside EEZ boundary
                 lats_clipped = ds_clipped.coords[lat_coord_name].values
@@ -610,6 +644,21 @@ def process_oscar_core(task: LayerTask, report_progress, output_dir: str, cache_
             ds.close()
 
 def process(task: LayerTask, report_progress, output_dir: str, cache_dir: str, username: str, password: str) -> bool:
+    """Process OSCAR ocean currents data.
+
+    Downloads the latest OSCAR ocean surface current data and converts it to KML format.
+
+    Args:
+        task: Layer task configuration
+        report_progress: Progress reporting function
+        output_dir: Output directory for generated files
+        cache_dir: Cache directory for downloaded data
+        username: NASA Earthdata username
+        password: NASA Earthdata password
+
+    Returns:
+        True if processing successful, False otherwise
+    """
     report_progress(0, f"Fetching latest ocean surface currents from NOAA OSCAR V2.0 NRT...")
     try:
         granule_url, latest_date = get_latest_oscar_nrt_granule_info()

@@ -1,3 +1,10 @@
+"""
+MarineRegions data downloader and processor.
+
+This module handles downloading geospatial data from MarineRegions.org,
+including territorial waters, EEZs, and other marine boundaries.
+"""
+
 import os
 import json
 import requests
@@ -92,6 +99,19 @@ async def process_async(session, task: LayerTask, report_progress, output_dir: s
                 pass
 
 def process(task: LayerTask, report_progress, output_dir: str, cache_dir: str) -> bool:
+    """Process MarineRegions layer data.
+
+    Downloads and processes geospatial data from MarineRegions.org for the specified layer type.
+
+    Args:
+        task: Layer task configuration
+        report_progress: Progress reporting function
+        output_dir: Output directory for generated files
+        cache_dir: Cache directory for downloaded data
+
+    Returns:
+        True if processing successful, False otherwise
+    """
     temp = task.output_path + ".temp"
 
     # Clean any possible leftover temp file

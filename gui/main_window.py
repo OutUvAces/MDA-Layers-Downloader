@@ -1,4 +1,11 @@
-# gui/main_window.py
+"""
+Main GUI window for the MDA Layers Downloader application.
+
+This module provides the primary user interface for configuring and running
+marine data layer downloads, including layer selection, color customization,
+and progress monitoring.
+"""
+
 import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog, colorchooser
 import webbrowser
@@ -66,6 +73,11 @@ seastate_density_country = None
 seastate_density_global = None
 
 def log(message):
+    """Add a message to the GUI log display.
+
+    Args:
+        message: Text message to display in the log
+    """
     global log_text
     if log_text:
         log_text.config(state="normal")

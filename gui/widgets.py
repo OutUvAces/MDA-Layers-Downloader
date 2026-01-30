@@ -1,4 +1,10 @@
-# gui/widgets.py
+"""
+GUI widget utilities and helper functions.
+
+This module provides reusable GUI components and utility functions
+for the application's user interface.
+"""
+
 import tkinter as tk
 from tkinter import ttk, colorchooser
 import webbrowser

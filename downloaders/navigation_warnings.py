@@ -207,7 +207,7 @@ def extract_feature_description(full_text: str, all_coord_sets: list, current_co
     """
     import re
 
-    if len(current_coord_set) < 3 or not all_coord_sets:
+    if len(current_coord_set) < 2 or not all_coord_sets:
         return None
 
     # Special case: if there's only one coordinate set, return full text as-is
@@ -906,7 +906,7 @@ def get_warning_color(category, use_custom_colors=True, single_color_hex=None, o
             return alpha_hex + rgb_part
         else:
             # Fallback: if it's not in expected format, apply opacity using hex_to_kml_abgr
-            # Convert ABGR back to hex format first (this is a bit hacky but should work)
+            # Extract RGB part from ABGR and convert back to hex format
             rgb_hex = base_color[2:8]  # Extract RGB part from ABGR
             return hex_to_kml_abgr(f"#{rgb_hex}", opacity_percent)
 
@@ -1656,33 +1656,6 @@ def create_warnings_kml(warnings_data, output_path, color_abgr=None, use_custom_
                             feature_text = extract_feature_description(full_text, coords, coord_set)
 
                     desc = create_warning_description(warning, category, feature_text)
-
-                    # Add berth buffer information for this specific coordinate set
-                    if isinstance(coord_set, list) and len(coord_set) >= 2 and isinstance(coord_set[0], str):
-                        coord_type = coord_set[0]
-                        coord_data = coord_set[1]
-
-                        if coord_type.startswith('CIRCULAR_AREA') and isinstance(coord_data, list) and len(coord_data) > 20:
-                            # Estimate radius for circular areas created from berth buffers
-                            # These are typically 64+ point approximations, so we can estimate radius
-                            if len(coord_data) > 2:
-                                # For circular approximations, calculate radius from center to first point
-                                # Approximate center (not perfect but good enough for description)
-                                lats = [pt[0] for pt in coord_data]
-                                lons = [pt[1] for pt in coord_data]
-                                center_lat = (max(lats) + min(lats)) / 2
-                                center_lon = (max(lons) + min(lons)) / 2
-
-                                # Calculate radius from center to first point
-                                first_point = coord_data[0]
-                                radius_deg = ((first_point[0] - center_lat)**2 + (first_point[1] - center_lon)**2)**0.5
-                                radius_nm = radius_deg / 0.01667  # Convert degrees to nautical miles
-                                desc += f"<br><br><b>Berth Buffer:</b> {radius_nm:.1f} nautical miles"
-
-                        elif coord_type.startswith('TRACKLINE_BERTH_AREA'):
-                            # For trackline berth areas, we need to estimate the berth distance
-                            # This is more complex, but we can add a generic message
-                            desc += "<br><br><b>Berth Buffer:</b> Applied to trackline"
 
                     desc_elem = ET.SubElement(placemark, 'description')
                     desc_elem.text = desc
