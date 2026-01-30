@@ -153,6 +153,12 @@ MDA-Layers-Downloader/
 
 This project is open source.
 
+## 🐛 Issues & Feature Requests
+
+Found a bug or want to request a new marine data layer? Please [create an issue](https://github.com/OutUvAces/MDA-Layers-Downloader/issues) on GitHub.
+
+See our [development roadmap](ROADMAP.md) for planned features and upcoming enhancements.
+
 ## 🙏 Acknowledgments
 
 - **MarineRegions.org** for providing comprehensive marine boundary data
