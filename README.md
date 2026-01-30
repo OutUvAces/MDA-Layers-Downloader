@@ -39,43 +39,27 @@ The application integrates data from authoritative marine geospatial sources:
 
 See the detailed [Installation Guide](INSTALL.md) for comprehensive setup instructions.
 
-### Anaconda/Miniconda (Most Reliable)
-Due to the complexity of geospatial libraries, Anaconda provides the most reliable installation:
+### Install from Source (Recommended)
+Due to the complexity of geospatial libraries, the most reliable way to run this application is from source:
 
-1. **Install Miniconda:** Download from https://docs.conda.io/en/latest/miniconda.html
+#### Option 1: Conda (Preferred)
+```bash
+git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
+cd MDA-Layers-Downloader
+conda env create -f environment.yml
+conda activate mda-layers-downloader
+python main.py
+```
 
-2. **Clone and setup:**
-   ```bash
-   git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
-   cd MDA-Layers-Downloader
-   conda create -n mda-layers python=3.9 -y
-   conda activate mda-layers
-   conda install -c conda-forge geopandas fiona pyproj shapely xarray netcdf4 aiohttp requests -y
-   ```
+#### Option 2: Pip
+```bash
+git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
+cd MDA-Layers-Downloader
+pip install -r requirements.txt
+python main.py
+```
 
-3. **Run the application:**
-   ```bash
-   python main.py
-   ```
-
-### Install from Source (pip)
-Alternative installation using pip:
-
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
-   cd MDA-Layers-Downloader
-   ```
-
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Run the application:**
-   ```bash
-   python main.py
-   ```
+**Note:** Conda provides better compatibility with geospatial libraries and is recommended.
 
 ### Portable Executable (Experimental)
 A portable executable is available for testing but may have compatibility issues with geospatial libraries. Download `MDA_Layers_Downloader_v1.3_portable.zip` from [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases) if you prefer not to install dependencies.

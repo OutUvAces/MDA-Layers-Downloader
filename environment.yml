@@ -1,0 +1,45 @@
+name: mda-layers-downloader
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Core Python
+  - python=3.10
+
+  # Geospatial libraries (conda-forge has better support)
+  - geopandas
+  - fiona
+  - pyogrio
+  - shapely
+  - pyproj
+  - gdal
+  - rasterio
+
+  # Data processing
+  - pandas
+  - numpy
+  - xarray
+  - netcdf4
+  - h5netcdf
+  - cftime
+
+  # Web requests
+  - requests
+  - aiohttp
+
+  # GUI
+  - tk
+
+  # Build tools
+  - pyinstaller
+  - conda-pack
+  - constructor
+
+  # Additional dependencies that might be needed
+  - proj
+  - geos
+  - libgdal
+  - libnetcdf
+  - hdf5
+  - curl
+  - openssl
