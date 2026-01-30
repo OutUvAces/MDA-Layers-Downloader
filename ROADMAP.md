@@ -25,7 +25,7 @@ This document outlines the planned features, improvements, and future enhancemen
 ### Quality Assurance
 - **KML feature attributes validation** - Verify all output layers have correct KML attributes
 - **Geographic data verification**
-  - Albania continuous zone boundaries
+  - Albania contiguous zone boundaries
   - USA EEZ boundaries
 
 ## 🗺️ New Data Sources
@@ -38,8 +38,8 @@ This document outlines the planned features, improvements, and future enhancemen
 - **Offshore wind farms** - Wind energy installation areas
 - **Offshore anchorage areas** - Designated marine anchorage zones
 - **Fisheries data** - Fishing area boundaries and regulations
-- **Cerulean data** - Ocean monitoring and research data
-- **Port/NAV charts** - Nautical chart data and port information
+- **Cerulean data** - Ocean monitoring and research data focused on oil spills
+- **Port/NAV charts** - Nautical chart data and port charts
 
 ## 📋 Implementation Notes
 
