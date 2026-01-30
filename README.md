@@ -58,7 +58,7 @@ The application integrates data from authoritative marine geospatial sources:
 
 2. **Install dependencies:**
    ```bash
-   pip install -r requirements.txt
+   pip install geopandas requests shapely xarray netCDF4
    ```
 
 3. **Run the application:**
