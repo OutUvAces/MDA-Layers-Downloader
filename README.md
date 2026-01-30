@@ -37,39 +37,23 @@ The application integrates data from authoritative marine geospatial sources:
 
 ## 🛠️ Installation
 
-### Prerequisites
-- Python 3.8 or higher
-- Required Python packages:
-  ```
-  geopandas>=0.12.0
-  requests>=2.28.0
-  shapely>=1.8.0
-  xarray>=2022.06.0
-  netCDF4>=1.6.0
-  ```
+See the detailed [Installation Guide](INSTALL.md) for multiple setup options including portable executables and source installation.
 
-### Setup Instructions
+### Quick Setup
 
-1. **Clone the repository:**
-   ```bash
-   git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
-   cd MDA-Layers-Downloader
-   ```
+**Option 1: Portable Executable (Easiest)**
+1. Download `MDA_Layers_Downloader_v1.3_portable.zip` from [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases)
+2. Unzip and run the `.exe` file
 
-2. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Run the application:**
-   ```bash
-   python main.py
-   ```
+**Option 2: Install from Source**
+1. Clone: `git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git`
+2. Install: `pip install -r requirements.txt`
+3. Run: `python main.py`
 
 ## 🚀 Usage
 
 ### Windows Executable (Recommended)
-Download the latest `MDA_Layers_Downloader_v1.3.exe` from the [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases) page. This standalone executable includes all dependencies and can run on Windows without Python installation.
+Download the latest `MDA_Layers_Downloader_v1.3_portable.zip` from the [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases) page. This portable package contains the executable and all required dependencies - simply unzip and run the `.exe` file.
 
 ### GUI Mode (Python)
 Simply run `python main.py` to launch the graphical interface where you can:
