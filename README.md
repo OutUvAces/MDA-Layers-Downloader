@@ -30,7 +30,7 @@ The application integrates data from authoritative marine geospatial sources:
 - **MarineRegions.org** - Territorial waters, EEZ, ECS boundaries
 - **Protected Planet (WDPA)** - Marine protected areas
 - **NASA OSCAR** - Ocean surface current analysis
-- **Submarine Cable Map** - Global submarine cable infrastructure
+- **TeleGeography** - Global submarine cable infrastructure
 - **NGA MSI** - Navigation warnings and maritime safety information
 
 ## 🛠️ Installation
@@ -102,7 +102,6 @@ Each data layer supports customization:
 ### Authentication
 Some data sources require authentication:
 - **NASA OSCAR**: Requires Earthdata login credentials
-- **NGA MSI**: Uses public APIs (no authentication required)
 
 ## 📁 Project Structure
 
@@ -148,23 +147,6 @@ MDA-Layers-Downloader/
 - Modular architecture with clear separation of concerns
 - Extensive error handling and logging
 
-### Testing
-The project includes comprehensive testing capabilities for data parsing and extraction functions. Test scripts are maintained separately from the main codebase.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-- Follow PEP 8 style guidelines
-- Add docstrings to all new functions and classes
-- Include type hints for function parameters and return values
-- Test changes thoroughly before submitting
-
 ## 📄 License
 
 This project is open source. Please check the license file for specific terms and conditions.
@@ -176,10 +158,6 @@ This project is open source. Please check the license file for specific terms an
 - **NASA PO.DAAC** for OSCAR ocean current data
 - **NGA MSI** for navigation warning services
 - **Submarine Cable Map** for cable infrastructure data
-
-## 📞 Support
-
-For issues, questions, or contributions, please use the GitHub issue tracker or submit pull requests.
 
 ---
 
