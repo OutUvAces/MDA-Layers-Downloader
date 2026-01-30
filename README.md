@@ -37,23 +37,31 @@ The application integrates data from authoritative marine geospatial sources:
 
 ## 🛠️ Installation
 
-See the detailed [Installation Guide](INSTALL.md) for multiple setup options including portable executables and source installation.
+See the detailed [Installation Guide](INSTALL.md) for comprehensive setup instructions.
 
-### Quick Setup
+### Install from Source (Recommended)
+Due to the complexity of geospatial libraries, the most reliable way to run this application is from source:
 
-**Option 1: Portable Executable (Easiest)**
-1. Download `MDA_Layers_Downloader_v1.3_portable.zip` from [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases)
-2. Unzip and run the `.exe` file
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
+   cd MDA-Layers-Downloader
+   ```
 
-**Option 2: Install from Source**
-1. Clone: `git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git`
-2. Install: `pip install -r requirements.txt`
-3. Run: `python main.py`
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **Run the application:**
+   ```bash
+   python main.py
+   ```
+
+### Portable Executable (Experimental)
+A portable executable is available for testing but may have compatibility issues with geospatial libraries. Download `MDA_Layers_Downloader_v1.3_portable.zip` from [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases) if you prefer not to install dependencies.
 
 ## 🚀 Usage
-
-### Windows Executable (Recommended)
-Download the latest `MDA_Layers_Downloader_v1.3_portable.zip` from the [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases) page. This portable package contains the executable and all required dependencies - simply unzip and run the `.exe` file.
 
 ### GUI Mode (Python)
 Simply run `python main.py` to launch the graphical interface where you can:

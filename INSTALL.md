@@ -4,13 +4,8 @@ This guide provides multiple ways to install and run the MDA Layers Downloader.
 
 ## 🚀 Quick Start (Recommended)
 
-### Option 1: Portable Executable (Easiest)
-1. Download `MDA_Layers_Downloader_v1.3_portable.zip` from [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases)
-2. Unzip the downloaded file
-3. Run `MDA_Layers_Downloader_v1.3_dir.exe` from the unzipped folder
-4. No installation required!
-
-### Option 2: Install from Source
+### Install from Source (Most Reliable)
+Due to the complexity of geospatial libraries, installing from source provides the most reliable experience:
 
 #### Prerequisites
 - Python 3.8 or higher
@@ -33,6 +28,13 @@ This guide provides multiple ways to install and run the MDA Layers Downloader.
    ```bash
    python main.py
    ```
+
+### Portable Executable (Experimental)
+A portable executable is available for testing but may have compatibility issues with geospatial libraries:
+
+1. Download `MDA_Layers_Downloader_v1.3_portable.zip` from [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases)
+2. Unzip the downloaded file
+3. Run `MDA_Layers_Downloader_v1.3_dir.exe` from the unzipped folder
 
 ## 📋 System Requirements
 
