@@ -39,8 +39,27 @@ The application integrates data from authoritative marine geospatial sources:
 
 See the detailed [Installation Guide](INSTALL.md) for comprehensive setup instructions.
 
-### Install from Source (Recommended)
-Due to the complexity of geospatial libraries, the most reliable way to run this application is from source:
+### Anaconda/Miniconda (Most Reliable)
+Due to the complexity of geospatial libraries, Anaconda provides the most reliable installation:
+
+1. **Install Miniconda:** Download from https://docs.conda.io/en/latest/miniconda.html
+
+2. **Clone and setup:**
+   ```bash
+   git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
+   cd MDA-Layers-Downloader
+   conda create -n mda-layers python=3.9 -y
+   conda activate mda-layers
+   conda install -c conda-forge geopandas fiona pyproj shapely xarray netcdf4 aiohttp requests -y
+   ```
+
+3. **Run the application:**
+   ```bash
+   python main.py
+   ```
+
+### Install from Source (pip)
+Alternative installation using pip:
 
 1. **Clone the repository:**
    ```bash
