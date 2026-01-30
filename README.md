@@ -157,7 +157,7 @@ This project is open source. Please check the license file for specific terms an
 - **Protected Planet** for the World Database on Protected Areas
 - **NASA PO.DAAC** for OSCAR ocean current data
 - **NGA MSI** for navigation warning services
-- **Submarine Cable Map** for cable infrastructure data
+- **TeleGeography** for cable infrastructure data
 
 ---
 
