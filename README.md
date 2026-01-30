@@ -37,63 +37,38 @@ The application integrates data from authoritative marine geospatial sources:
 
 ## 🛠️ Installation
 
-See the detailed [Installation Guide](INSTALL.md) for comprehensive setup instructions.
+### Prerequisites
+- Python 3.8 or higher
+- Required Python packages:
+  ```
+  geopandas>=0.12.0
+  requests>=2.28.0
+  shapely>=1.8.0
+  xarray>=2022.06.0
+  netCDF4>=1.6.0
+  ```
 
-### Install from Source (Recommended)
-Due to the complexity of geospatial libraries, the most reliable way to run this application is from source:
+### Setup Instructions
 
-#### Option 1: Conda (Preferred)
-```bash
-git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
-cd MDA-Layers-Downloader
-conda env create -f environment.yml
-conda activate mda-layers-downloader
-python main.py
-```
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
+   cd MDA-Layers-Downloader
+   ```
 
-#### Option 2: Pip
-```bash
-git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
-cd MDA-Layers-Downloader
-pip install -r requirements.txt
-python main.py
-```
+2. **Install dependencies:**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-**Note:** Conda provides better compatibility with geospatial libraries and is recommended.
-
-### Install from Source (Recommended)
-Due to the complexity of geospatial libraries, the most reliable way to run this application is from source:
-
-#### Option 1: Conda (Preferred)
-```bash
-git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
-cd MDA-Layers-Downloader
-conda env create -f environment.yml
-conda activate mda-layers-downloader
-python main.py
-```
-
-#### Option 2: Pip
-```bash
-git clone https://github.com/OutUvAces/MDA-Layers-Downloader.git
-cd MDA-Layers-Downloader
-pip install -r requirements.txt
-python main.py
-```
-
-**Note:** Conda provides better compatibility with geospatial libraries and is recommended.
-
-### Portable Directory (Alternative)
-A portable directory version is available for users who prefer not to install dependencies:
-
-1. Download `MDA_Layers_Downloader_v1.3_portable.zip` from [GitHub Releases](https://github.com/OutUvAces/MDA-Layers-Downloader/releases)
-2. Unzip and run the included `.exe` file
-
-See [INSTALL.md](INSTALL.md) for comprehensive installation instructions.
+3. **Run the application:**
+   ```bash
+   python main.py
+   ```
 
 ## 🚀 Usage
 
-### GUI Mode (Python)
+### GUI Mode (Recommended)
 Simply run `python main.py` to launch the graphical interface where you can:
 - Select which marine data layers to download
 - Configure colors, opacity, and density settings

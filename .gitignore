@@ -18,3 +18,30 @@ _cache/
 # OS
 .DS_Store
 Thumbs.db
+
+# Build artifacts
+build/
+dist/
+*.spec
+*.exe
+*.msi
+*.dmg
+
+# Package files
+*.egg-info/
+*.whl
+*.tar.gz
+
+# Conda/Miniconda
+miniconda.exe
+Miniconda*.exe
+anaconda.exe
+Anaconda*.exe
+
+# Environment files
+environment.yml
+requirements.txt
+
+# Build scripts
+*.bat
+*.sh
