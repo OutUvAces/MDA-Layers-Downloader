@@ -46,6 +46,10 @@ The application integrates data from authoritative marine geospatial sources:
   shapely>=1.8.0
   xarray>=2022.06.0
   netCDF4>=1.6.0
+  numpy>=1.21.0
+  pandas>=1.4.0
+  aiohttp>=3.8.0
+  pyproj>=3.3.0
   ```
 
 ### Setup Instructions
