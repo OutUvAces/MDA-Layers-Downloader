@@ -27,7 +27,7 @@ import queue
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from core.types import LayerSettings
-from workers.download_worker import process_all
+from workers.download_worker import worker
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'mda-layers-downloader-web-secret-key')
@@ -63,7 +63,7 @@ def run_download_task(task_id, settings, country_path, global_path, cache_path, 
                 progress_queue.put({"type": "progress", "content": delta})
 
         # Run the processing
-        success = process_all(settings, country_path, global_path, cache_path, iso_code, country_name, progress_callback)
+        success = worker(settings, username, password, str(country_path), str(global_path), cache_path, iso_code, country_name, progress_callback)
 
         if success:
             progress_queue.put({"type": "complete", "content": "Download completed successfully!"})
