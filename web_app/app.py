@@ -110,19 +110,26 @@ def start_download():
             seastate_color=request.form.get('seastate_color', '#000000'),
             navwarnings_color=request.form.get('navwarnings_color', '#ff0000'),
 
-            # Opacity values
-            territorial_opacity=int(request.form.get('territorial_opacity', '20')),
-            contiguous_opacity=int(request.form.get('contiguous_opacity', '20')),
-            mpa_opacity=int(request.form.get('mpa_opacity', '20')),
-            eez_opacity=int(request.form.get('eez_opacity', '20')),
-            ecs_opacity=int(request.form.get('ecs_opacity', '20')),
-            cables_opacity=int(request.form.get('cables_opacity', '50')),
-            seastate_opacity=int(request.form.get('seastate_opacity', '20')),
-            navwarnings_opacity=int(request.form.get('navwarnings_opacity', '80')),
+            # Opacity values (as strings)
+            territorial_opacity=request.form.get('territorial_opacity', '20'),
+            contiguous_opacity=request.form.get('contiguous_opacity', '20'),
+            mpa_opacity=request.form.get('mpa_opacity', '20'),
+            eez_opacity=request.form.get('eez_opacity', '20'),
+            ecs_opacity=request.form.get('ecs_opacity', '20'),
+            cables_opacity=request.form.get('cables_opacity', '50'),
+            seastate_opacity=request.form.get('seastate_opacity', '20'),
+            navwarnings_opacity=request.form.get('navwarnings_opacity', '80'),
 
             # Other settings
             seastate_country=request.form.get('seastate_country') == 'on',
-            density=request.form.get('density', 'medium')
+
+            # Sea state density settings (defaults)
+            seastate_density_country=1.0,
+            seastate_density_global=0.5,
+
+            # Other flags
+            navwarnings_custom=False,
+            cables_random=False
         )
 
         # Create unique task ID
