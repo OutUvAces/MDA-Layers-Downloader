@@ -45,34 +45,91 @@ This is a web-based interface for the MDA Layers Downloader marine geospatial da
 
 ### Development
 
+#### Quick Start (macOS/Linux)
+
 ```bash
+# 1. Navigate to web app directory
 cd web_app
 
-# Option 1: Automated setup (recommended)
-python setup.py
+# 2. Install system dependencies (macOS)
+brew install gdal geos proj
 
-# Option 2: Manual setup
+# Ubuntu/Debian alternative:
+# sudo apt-get update && sudo apt-get install libgdal-dev gdal-bin libgeos-dev libproj-dev proj-data
+
+# 3. Create virtual environment
 python -m venv venv
-source venv/bin/activate  # On macOS/Linux
-# venv\Scripts\activate   # On Windows
+source venv/bin/activate  # macOS/Linux
+# venv\Scripts\activate   # Windows
+
+# 4. Install Python dependencies
 pip install -r requirements.txt
 
-# Run the development server
+# 5. If geopandas installation fails:
+pip install --no-binary :all: geopandas
+# Or use conda: conda install -c conda-forge geopandas gdal
+
+# 6. Set environment variables (optional)
+export FLASK_SECRET_KEY="dev-secret-key"
+export FLASK_DEBUG=1
+
+# 7. Run the development server
 python run.py
-# Or directly:
-python app.py
+
+# Alternative direct Flask run:
+# python app.py
 ```
 
 The application will be available at `http://localhost:5000`
 
 ### Quick Test
 
-1. Open http://localhost:5000 in your browser
-2. Select "Japan" as country and "JPN" as ISO code
-3. Check 1-2 layers (e.g., "Territorial Waters", "Exclusive Economic Zone")
-4. Click "Start Download"
-5. Watch progress updates in the log area
-6. When complete, download the generated ZIP files
+1. **Open browser**: Go to `http://localhost:5000`
+2. **Fill form**:
+   - Country: "Japan"
+   - ISO Code: "JPN"
+   - Check: "Territorial Waters" and "Exclusive Economic Zone"
+3. **Click "Start Download"**
+4. **Monitor progress**:
+   - Browser shows progress page with real-time updates
+   - Terminal shows detailed processing logs
+5. **On completion**: Download buttons appear for country/global ZIP files
+6. **Verify**: Downloaded ZIP contains KML marine data layers
+
+### Expected Server Output
+
+```
+Starting MDA Layers Downloader Web Application on port 5000
+Debug mode: True
+ * Running on http://127.0.0.1:5000 (Press CTRL+C to quit)
+```
+
+### Troubleshooting
+
+#### Import Errors ("No module named core.types")
+- Ensure you're running from the `web_app` directory
+- Virtual environment must be activated
+- All dependencies must be installed
+
+#### Port 5000 Already in Use
+```bash
+# Use different port
+export FLASK_RUN_PORT=5001
+python run.py
+```
+
+#### GDAL/GeoPandas Installation Issues
+```bash
+# Try without binary packages
+pip install --no-binary :all: geopandas
+
+# Or use conda (recommended)
+conda install -c conda-forge geopandas gdal
+```
+
+#### Permission Errors
+- Ensure write access to `web_app/uploads/` and `web_app/outputs/` directories
+- The app creates these automatically on startup
 
 ### Local Development Setup
 

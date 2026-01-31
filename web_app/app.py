@@ -30,7 +30,7 @@ from core.types import LayerSettings
 from workers.download_worker import process_all
 
 app = Flask(__name__)
-app.secret_key = 'mda-layers-downloader-web-secret-key'
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', 'mda-layers-downloader-web-secret-key')
 
 # Configuration
 UPLOAD_FOLDER = 'uploads'
