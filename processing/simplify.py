@@ -7,8 +7,9 @@ file sizes while preserving topological relationships.
 
 import geopandas as gpd
 from typing import Optional
+from shapely import Geometry
 
-def simplify_geom(geom: Optional[gpd.Geometry], tol: float):
+def simplify_geom(geom: Optional[Geometry], tol: float):
     """Simplify a geometry while preserving topology.
 
     Applies the Douglas-Peucker simplification algorithm to reduce the number
