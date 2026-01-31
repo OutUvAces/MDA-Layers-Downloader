@@ -48,11 +48,14 @@ This is a web-based interface for the MDA Layers Downloader marine geospatial da
 ```bash
 cd web_app
 
-# Activate virtual environment (if not using setup.py)
-# On Windows:
-venv\Scripts\activate
-# On Linux/Mac:
-source venv/bin/activate
+# Option 1: Automated setup (recommended)
+python setup.py
+
+# Option 2: Manual setup
+python -m venv venv
+source venv/bin/activate  # On macOS/Linux
+# venv\Scripts\activate   # On Windows
+pip install -r requirements.txt
 
 # Run the development server
 python run.py
@@ -70,6 +73,41 @@ The application will be available at `http://localhost:5000`
 4. Click "Start Download"
 5. Watch progress updates in the log area
 6. When complete, download the generated ZIP files
+
+### Local Development Setup
+
+For the first time setup on macOS/Linux:
+
+```bash
+# 1. Navigate to web app
+cd web_app
+
+# 2. Install system dependencies (if needed)
+# macOS:
+brew install gdal geos proj
+
+# Ubuntu/Debian:
+sudo apt-get update
+sudo apt-get install libgdal-dev gdal-bin libgeos-dev libproj-dev proj-data
+
+# 3. Create virtual environment and install
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+
+# 4. If geopandas fails, try:
+pip install --no-binary :all: geopandas
+# or use conda:
+# conda install -c conda-forge geopandas gdal
+
+# 5. Run the app
+python run.py
+
+# 6. Alternative direct Flask run
+export FLASK_APP=app.py
+export FLASK_DEBUG=1
+flask run --host=0.0.0.0 --port=5000
+```
 
 ### Production Deployment
 
