@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Download Progress - MDA Layers Downloader{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h1 class="h4 mb-0"><i class="fas fa-spinner fa-spin"></i> Download Progress</h1>
+            </div>
+            <div class="card-body">
+                <div class="progress-container">
+                    <div class="progress mb-3">
+                        <div class="progress-bar" role="progressbar" style="width: 0%" id="progressBar">
+                            0%
+                        </div>
+                    </div>
+                    <div class="text-center">
+                        <small class="text-muted" id="progressText">Initializing download...</small>
+                    </div>
+                </div>
+
+                <div class="log-container">
+                    <div id="logMessages">
+                        <div class="log-message text-muted">Starting download process...</div>
+                    </div>
+                </div>
+
+                <div class="mt-4 text-center" id="downloadButtons" style="display: none;">
+                    <h5>Download Complete!</h5>
+                    <p>Your marine data layers are ready for download:</p>
+                    <div class="btn-group" role="group">
+                        <a href="{{ url_for('download', task_id=task_id, path_type='country') }}" class="btn btn-success">
+                            <i class="fas fa-download"></i> Download Country Data
+                        </a>
+                        <a href="{{ url_for('download', task_id=task_id, path_type='global') }}" class="btn btn-primary">
+                            <i class="fas fa-download"></i> Download Global Data
+                        </a>
+                    </div>
+                </div>
+
+                <div class="mt-3 text-center">
+                    <a href="{{ url_for('index') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Back to Form
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let progressInterval;
+
+function updateProgress() {
+    fetch(`/progress_update/{{ task_id }}`)
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                clearInterval(progressInterval);
+                document.getElementById('progressText').textContent = 'Error: ' + data.error;
+                return;
+            }
+
+            // Update progress bar
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            progressBar.style.width = data.progress + '%';
+            progressBar.textContent = Math.round(data.progress) + '%';
+            progressText.textContent = data.progress + '% complete';
+
+            // Update log messages
+            const logContainer = document.getElementById('logMessages');
+            logContainer.innerHTML = '';
+            data.messages.forEach(message => {
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'log-message';
+                messageDiv.textContent = message;
+                logContainer.appendChild(messageDiv);
+            });
+
+            // Auto-scroll to bottom
+            logContainer.scrollTop = logContainer.scrollHeight;
+
+            // Check if complete
+            if (data.status === 'complete') {
+                clearInterval(progressInterval);
+                document.getElementById('downloadButtons').style.display = 'block';
+                progressText.textContent = 'Download completed!';
+            } else if (data.status === 'error') {
+                clearInterval(progressInterval);
+                progressBar.className = 'progress-bar bg-danger';
+                progressText.textContent = 'Download failed';
+            }
+        })
+        .catch(error => {
+            console.error('Error updating progress:', error);
+        });
+}
+
+// Start progress updates
+document.addEventListener('DOMContentLoaded', function() {
+    updateProgress(); // Initial update
+    progressInterval = setInterval(updateProgress, 2000); // Update every 2 seconds
+});
+</script>
+{% endblock %}

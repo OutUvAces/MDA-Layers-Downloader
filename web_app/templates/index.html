@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}MDA Layers Downloader - Marine Data Portal{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-lg-8 mx-auto">
+        <div class="card">
+            <div class="card-header">
+                <h1 class="h3 mb-0"><i class="fas fa-globe-asia"></i> Marine Data Layers Downloader</h1>
+            </div>
+            <div class="card-body">
+                <p class="text-muted">Download marine geospatial data layers for visualization in tools like Google Earth. Select your country and choose the data layers you need.</p>
+
+                <form method="post" action="{{ url_for('start_download') }}">
+                    <!-- Country Selection -->
+                    <div class="mb-4">
+                        <h5><i class="fas fa-map-marker-alt"></i> Country Selection</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label for="country" class="form-label">Country</label>
+                                <select class="form-select" id="country" name="country" required>
+                                    <option value="">Select a country...</option>
+                                    <option value="Japan">Japan</option>
+                                    <option value="United States">United States</option>
+                                    <option value="China">China</option>
+                                    <option value="South Korea">South Korea</option>
+                                    <option value="Russia">Russia</option>
+                                    <option value="Philippines">Philippines</option>
+                                    <option value="Vietnam">Vietnam</option>
+                                    <option value="Malaysia">Malaysia</option>
+                                    <option value="Indonesia">Indonesia</option>
+                                    <!-- Add more countries as needed -->
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="iso_code" class="form-label">ISO Code</label>
+                                <input type="text" class="form-control" id="iso_code" name="iso_code" placeholder="e.g., JPN" required>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Country-Specific Layers -->
+                    <div class="layer-card">
+                        <h5><i class="fas fa-flag"></i> Country-Specific Layers</h5>
+                        <p class="text-muted small">These layers are specific to the selected country</p>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="territorial" name="territorial">
+                                    <label class="form-check-label" for="territorial">
+                                        Territorial Waters (12nm)
+                                    </label>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="contiguous" name="contiguous">
+                                    <label class="form-check-label" for="contiguous">
+                                        Contiguous Zone (24nm)
+                                    </label>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="mpa" name="mpa">
+                                    <label class="form-check-label" for="mpa">
+                                        Marine Protected Areas
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="eez" name="eez">
+                                    <label class="form-check-label" for="eez">
+                                        Exclusive Economic Zone (200nm)
+                                    </label>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="ecs" name="ecs">
+                                    <label class="form-check-label" for="ecs">
+                                        Extended Continental Shelf
+                                    </label>
+                                </div>
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="seastate_country" name="seastate_country">
+                                    <label class="form-check-label" for="seastate_country">
+                                        Ocean Currents (Country)
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Global Layers -->
+                    <div class="layer-card">
+                        <h5><i class="fas fa-globe"></i> Global Layers</h5>
+                        <p class="text-muted small">These layers cover the entire world</p>
+
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="cables" name="cables">
+                            <label class="form-check-label" for="cables">
+                                Submarine Cables
+                            </label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="seastate_global" name="seastate_global">
+                            <label class="form-check-label" for="seastate_global">
+                                Ocean Currents (Global)
+                            </label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="navwarnings" name="navwarnings">
+                            <label class="form-check-label" for="navwarnings">
+                                Navigation Warnings
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Styling Options -->
+                    <div class="layer-card">
+                        <h5><i class="fas fa-palette"></i> Styling Options</h5>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <label class="form-label">Territorial Waters Color</label>
+                                <input type="color" class="form-control form-control-color color-picker" id="territorial_color" name="territorial_color" value="#ffff00">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Opacity (%)</label>
+                                <input type="number" class="form-control" name="territorial_opacity" value="20" min="0" max="100">
+                            </div>
+                        </div>
+                        <!-- Add similar controls for other layers -->
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-download"></i> Start Download
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Auto-fill ISO code based on country selection
+document.getElementById('country').addEventListener('change', function() {
+    const countrySelect = this;
+    const isoInput = document.getElementById('iso_code');
+    const countryToIso = {
+        'Japan': 'JPN',
+        'United States': 'USA',
+        'China': 'CHN',
+        'South Korea': 'KOR',
+        'Russia': 'RUS',
+        'Philippines': 'PHL',
+        'Vietnam': 'VNM',
+        'Malaysia': 'MYS',
+        'Indonesia': 'IDN'
+    };
+
+    if (countrySelect.value && countryToIso[countrySelect.value]) {
+        isoInput.value = countryToIso[countrySelect.value];
+    }
+});
+</script>
+{% endblock %}

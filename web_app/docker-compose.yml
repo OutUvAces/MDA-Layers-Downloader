@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  mda-web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_SECRET_KEY=dev-secret-key-change-in-production
+    volumes:
+      # Mount for development (optional)
+      - ./templates:/home/app/templates
+      - ./static:/home/app/static
+      # Persistent storage for uploads and outputs
+      - mda_uploads:/home/app/uploads
+      - mda_outputs:/home/app/outputs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  mda_uploads:
+  mda_outputs:
