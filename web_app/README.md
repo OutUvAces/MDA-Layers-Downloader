@@ -111,6 +111,16 @@ Debug mode: True
 - Virtual environment must be activated
 - All dependencies must be installed
 
+#### cftime Import Error ("No module named 'cftime'")
+- Required for OSCAR currents NetCDF processing
+- Install via conda: `conda install -c conda-forge cftime`
+- Or via pip: `pip install cftime`
+
+#### Conda Environment Setup Issues
+- Ensure conda environment is activated: `conda activate mda-web`
+- If geopandas fails, try: `conda install -c conda-forge geopandas`
+- For NetCDF support: `conda install -c conda-forge netcdf4 cftime xarray`
+
 #### Port 5000 Already in Use
 ```bash
 # Use different port
@@ -132,6 +142,30 @@ conda install -c conda-forge geopandas gdal
 - The app creates these automatically on startup
 
 ### Local Development Setup
+
+#### Option 1: Conda Environment (Recommended for Windows/Linux)
+
+For users with conda/miniconda installed:
+
+```bash
+# 1. Navigate to web app
+cd web_app
+
+# 2. Create conda environment with geospatial dependencies
+conda create -n mda-web python=3.10 -y
+conda activate mda-web
+
+# 3. Install core geospatial packages via conda-forge
+conda install -c conda-forge geopandas shapely fiona pyproj gdal geos proj -y
+
+# 4. Install remaining Python packages via pip
+pip install -r requirements.txt
+
+# 5. For additional NetCDF support (OSCAR currents)
+conda install -c conda-forge netcdf4 cftime xarray -y
+```
+
+#### Option 2: Virtual Environment (macOS/Linux)
 
 For the first time setup on macOS/Linux:
 
