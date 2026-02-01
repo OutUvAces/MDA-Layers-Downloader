@@ -741,23 +741,34 @@ def refresh_dynamic_caches():
             return False
 
         # Find latest OSCAR data using CMR
-        from core.config import OSCAR_CMR_URL, OSCAR_COLLECTION_ID
-
         print("OSCAR: Searching for latest OSCAR data...")
-        search_url = f"{OSCAR_CMR_URL}/search/granules.json?collection_concept_id={OSCAR_COLLECTION_ID}&sort_key=-start_date&page_size=1"
+
+        # Use the correct CMR search URL
+        search_url = "https://cmr.earthdata.nasa.gov/search/granules.json"
+        params = {
+            'collection_concept_id': 'C2102958977-POCLOUD',  # OSCAR L4 Ocean Surface Currents collection
+            'sort_key': '-start_date',
+            'page_size': '1'
+        }
 
         headers = {"Authorization": f"Bearer {token}"}
-        response = requests.get(search_url, headers=headers, timeout=30)
+        response = requests.get(search_url, params=params, headers=headers, timeout=30)
+
+        if response.status_code == 401:
+            print("OSCAR: Authentication failed - token may be expired")
+            return False
+
         response.raise_for_status()
 
         data = response.json()
-        if 'feed' in data and 'entry' in data['feed'] and data['feed']['entry']:
+        if 'feed' in data and 'entry' in data['feed'] and len(data['feed']['entry']) > 0:
             granule = data['feed']['entry'][0]
             granule_url = None
 
             # Find the download URL for the NetCDF file
             for link in granule.get('links', []):
-                if link.get('rel') == 'http://esipfed.org/ns/fedsearch/1.1/data#' and link.get('href', '').endswith('.nc'):
+                if (link.get('rel') == 'http://esipfed.org/ns/fedsearch/1.1/data#' or
+                    link.get('rel') == 'enclosure') and link.get('href', '').endswith('.nc'):
                     granule_url = link['href']
                     break
 
@@ -768,6 +779,11 @@ def refresh_dynamic_caches():
 
                 # Download the NetCDF file
                 response = requests.get(granule_url, headers=headers, stream=True, timeout=300)
+
+                if response.status_code == 401:
+                    print("OSCAR: Download authentication failed")
+                    return False
+
                 response.raise_for_status()
 
                 with open(cache_file, 'wb') as f:
@@ -779,9 +795,11 @@ def refresh_dynamic_caches():
                 return True
             else:
                 print("OSCAR: No suitable download URL found")
+                print(f"OSCAR: Available links: {[link.get('href') for link in granule.get('links', []) if link.get('href', '').endswith('.nc')]}")
                 return False
         else:
             print("OSCAR: No OSCAR granules found")
+            print(f"OSCAR: Response: {data}")
             return False
     except Exception as e:
         print(f"OSCAR: Dynamic cache refresh failed: {e}")

@@ -1,3 +1,14 @@
+"""
+Submarine cables data downloader and processor.
+
+This module handles downloading submarine cable data from public sources.
+"""
+
+import os
+import json
+import requests
+from pathlib import Path
+
 def refresh_static_caches():
     """Refresh submarine cables static cache"""
     print("CABLES: Refreshing static cache...")
@@ -7,35 +18,54 @@ def refresh_static_caches():
         cache_dir = Path(__file__).parent.parent / "cache" / "static"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Submarine cable data sources are typically commercial or restricted
-        # For this demo, we'll create a placeholder indicating where real data would come from
-        # In production, you might use:
-        # - TeleGeography submarine cable database (commercial)
-        # - FCC cable landing station data (limited scope)
-        # - Custom data provider
+        # Try to download submarine cable data from a public source
+        # Note: Comprehensive cable data is usually commercial, but some public sources exist
+        cables_urls = [
+            "https://raw.githubusercontent.com/telegeography/www.submarinecablemap.com/master/public/cable-geo.json",
+            "https://submarinecablemap.com/api/v3/cables/all.json",
+            "https://api.submarinecablemap.com/v3/cables/all.json"
+        ]
 
         cache_file = cache_dir / "cables_global.geojson"
 
-        print("CABLES: Submarine cable data requires commercial data source")
-        print("CABLES: Creating placeholder for demonstration")
+        for url in cables_urls:
+            try:
+                print(f"CABLES: Trying to download from {url}")
+                response = requests.get(url, timeout=60)
+                response.raise_for_status()
 
-        # Create a minimal placeholder with a few example cable features
-        placeholder_data = {
-            "type": "FeatureCollection",
-            "features": [
-                {
-                    "type": "Feature",
-                    "properties": {"name": "Example Cable 1", "capacity": "Example"},
-                    "geometry": {"type": "LineString", "coordinates": [[-74.0, 40.7], [-0.1, 51.5]]}
-                }
-            ]
-        }
+                # Validate that we got JSON data
+                data = response.json()
+                if isinstance(data, (list, dict)) and len(str(data)) > 1000:  # Reasonable size check
+                    with open(cache_file, 'w', encoding='utf-8') as f:
+                        json.dump(data, f, indent=2)
 
-        import json
-        with open(cache_file, 'w', encoding='utf-8') as f:
-            json.dump(placeholder_data, f, indent=2)
+                    print(f"CABLES: Downloaded submarine cable data, size = {cache_file.stat().st_size} bytes")
+                    break
+                else:
+                    print(f"CABLES: Response too small or invalid format from {url}")
+                    continue
+            except Exception as e:
+                print(f"CABLES: Failed to download from {url}: {e}")
+                continue
+        else:
+            # If all sources fail, create a minimal placeholder
+            print("CABLES: All download sources failed, creating placeholder")
+            placeholder_data = {
+                "type": "FeatureCollection",
+                "features": [
+                    {
+                        "type": "Feature",
+                        "properties": {"name": "Example Cable 1", "capacity": "Example"},
+                        "geometry": {"type": "LineString", "coordinates": [[-74.0, 40.7], [-0.1, 51.5]]}
+                    }
+                ]
+            }
 
-        print(f"CABLES: Created placeholder cable data, size = {cache_file.stat().st_size} bytes")
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(placeholder_data, f, indent=2)
+
+            print(f"CABLES: Created placeholder cable data, size = {cache_file.stat().st_size} bytes")
         print("CABLES: Static cache refreshed successfully")
         return True
     except Exception as e:
