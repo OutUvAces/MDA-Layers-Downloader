@@ -344,13 +344,14 @@ def worker(
                 task_success = False
                 report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
         elif task.type == "seastate":
-            # Check OSCAR cache
+            # Check OSCAR cache (same data used for both country and global currents)
             oscar_cache_dir = Path(__file__).parent.parent / "cache" / "dynamic" / "oscar_currents"
             recent_files = list(oscar_cache_dir.glob("*.nc"))
             if recent_files:
                 # Use most recent OSCAR file (simplified - would need actual processing)
                 cache_file = max(recent_files, key=lambda x: x.stat().st_mtime)
                 # In real implementation, would process the NetCDF and generate KML
+                # Country vs Global would use different spatial filtering
                 task_success = True
                 report_progress(0, f"✓ {task.name} loaded from cache")
             else:
