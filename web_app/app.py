@@ -339,67 +339,111 @@ def start_download():
         print(f"  navwarnings_opacity={request.form.get('navwarnings_opacity')}")
 
         print("MAIN THREAD: Creating LayerSettings...")
-        try:
-            layer_settings = LayerSettings(
-                # Country-specific layers
-                territorial=request.form.get('territorial') == 'on',
-                contiguous=request.form.get('contiguous') == 'on',
-                mpa=request.form.get('mpa') == 'on',
-                eez=request.form.get('eez') == 'on',
-                ecs=request.form.get('ecs') == 'on',
+        layer_settings = LayerSettings(
+            # Country-specific layers
+            territorial=request.form.get('territorial') == 'on',
+            contiguous=request.form.get('contiguous') == 'on',
+            mpa=request.form.get('mpa') == 'on',
+            eez=request.form.get('eez') == 'on',
+            ecs=request.form.get('ecs') == 'on',
 
-                # Global layers
-                cables=request.form.get('cables') == 'on',
-                seastate_global=request.form.get('seastate_global') == 'on',
-                navwarnings=request.form.get('navwarnings') == 'on',
+            # Global layers
+            cables=request.form.get('cables') == 'on',
+            seastate_global=request.form.get('seastate_global') == 'on',
+            navwarnings=request.form.get('navwarnings') == 'on',
 
-                # Settings
-                territorial_color=request.form.get('territorial_color', '#ffff00'),
-                contiguous_color=request.form.get('contiguous_color', '#00ff00'),
-                mpa_color=request.form.get('mpa_color', '#ff0000'),
-                eez_color=request.form.get('eez_color', '#0000ff'),
-                ecs_color=request.form.get('ecs_color', '#8B4513'),
-                cables_color=request.form.get('cables_color', '#ffffff'),
-                seastate_color=request.form.get('seastate_color', '#000000'),
-                navwarnings_color=request.form.get('navwarnings_color', '#ff0000'),
+            # Settings
+            territorial_color=request.form.get('territorial_color', '#ffff00'),
+            contiguous_color=request.form.get('contiguous_color', '#00ff00'),
+            mpa_color=request.form.get('mpa_color', '#ff0000'),
+            eez_color=request.form.get('eez_color', '#0000ff'),
+            ecs_color=request.form.get('ecs_color', '#8B4513'),
+            cables_color=request.form.get('cables_color', '#ffffff'),
+            seastate_color=request.form.get('seastate_color', '#000000'),
+            navwarnings_color=request.form.get('navwarnings_color', '#ff0000'),
 
-                # Opacity values (as strings)
-                territorial_opacity=request.form.get('territorial_opacity', '20'),
-                contiguous_opacity=request.form.get('contiguous_opacity', '20'),
-                mpa_opacity=request.form.get('mpa_opacity', '20'),
-                eez_opacity=request.form.get('eez_opacity', '20'),
-                ecs_opacity=request.form.get('ecs_opacity', '20'),
-                cables_opacity=request.form.get('cables_opacity', '50'),
-                seastate_opacity=request.form.get('seastate_opacity', '20'),
-                navwarnings_opacity=request.form.get('navwarnings_opacity', '80'),
+            # Opacity values (as strings)
+            territorial_opacity=request.form.get('territorial_opacity', '20'),
+            contiguous_opacity=request.form.get('contiguous_opacity', '20'),
+            mpa_opacity=request.form.get('mpa_opacity', '20'),
+            eez_opacity=request.form.get('eez_opacity', '20'),
+            ecs_opacity=request.form.get('ecs_opacity', '20'),
+            cables_opacity=request.form.get('cables_opacity', '50'),
+            seastate_opacity=request.form.get('seastate_opacity', '20'),
+            navwarnings_opacity=request.form.get('navwarnings_opacity', '80'),
 
-                # Other settings
-                seastate_country=request.form.get('seastate_country') == 'on',
+            # Other settings
+            seastate_country=request.form.get('seastate_country') == 'on',
 
-                # Sea state density settings (defaults)
-                seastate_density_country=1.0,
-                seastate_density_global=0.5,
+            # Sea state density settings (defaults)
+            seastate_density_country=1.0,
+            seastate_density_global=0.5,
 
-                # Other flags
-                navwarnings_custom=False,
-                cables_random=False
-            )
-            print("MAIN THREAD: LayerSettings created successfully")
-            print(f"  layer_settings type = {type(layer_settings)}")
-            if hasattr(layer_settings, 'layers'):
-                print(f"  layer_settings.layers type = {type(layer_settings.layers)}, len = {len(layer_settings.layers) if layer_settings.layers else 'None'}")
-            else:
-                print("  layer_settings has no 'layers' attribute")
-        except TypeError as e:
-            print("MAIN THREAD: LayerSettings TypeError:", str(e))
-            import traceback
-            traceback.print_exc()
-            return jsonify({'error': str(e)}), 500
-        except Exception as e:
-            print("MAIN THREAD: LayerSettings General Error:", str(e))
-            import traceback
-            traceback.print_exc()
-            return jsonify({'error': str(e)}), 500
+            # Other flags
+            navwarnings_custom=False,
+            cables_random=False
+        )
+        print("MAIN THREAD: LayerSettings created successfully")
+        print(f"  layer_settings type = {type(layer_settings)}")
+        if hasattr(layer_settings, 'layers'):
+            print(f"  layer_settings.layers type = {type(layer_settings.layers)}, len = {len(layer_settings.layers) if layer_settings.layers else 'None'}")
+        else:
+            print("  layer_settings has no 'layers' attribute")
+
+        # Create unique task ID
+        task_id = f"task_{len(current_tasks)}"
+
+        # Set up directories
+        base_dir = Path(app.config['OUTPUT_FOLDER']) / task_id
+        base_dir.mkdir(exist_ok=True)
+
+        country_dir = base_dir / "country" if country else None
+        global_dir = base_dir / "global"
+        cache_dir = base_dir / "cache"
+
+        country_dir.mkdir(exist_ok=True)
+        global_dir.mkdir(exist_ok=True)
+        cache_dir.mkdir(exist_ok=True)
+
+        # Set up progress tracking
+        progress_queue = queue.Queue()
+        progress_data[task_id] = {
+            'messages': [],
+            'progress': 0,
+            'status': 'running',
+            'country_dir': str(country_dir) if country_dir else None,
+            'global_dir': str(global_dir),
+            'queue': progress_queue
+        }
+
+        # Start the download task in a background thread
+        print("MAIN THREAD: Starting download task")
+        print(f"  task_id = {task_id}")
+        print(f"  settings = {layer_settings}, layers = {layer_settings.layers if layer_settings else None}, layers type = {type(layer_settings.layers) if layer_settings and hasattr(layer_settings, 'layers') and layer_settings.layers else 'None'}")
+        print(f"  country_path = {country_dir}, type = {type(country_dir)}")
+        print(f"  global_path = {global_dir}, type = {type(global_dir)}")
+        print(f"  cache_path = {cache_dir}, type = {type(cache_dir)}")
+        print(f"  iso_code = {iso_code}, country_name = {country}")
+        print(f"  username = {username}, password_len = {len(password) if password else 'None'}")
+
+        download_thread = threading.Thread(
+            target=run_download_task,
+            args=(task_id, layer_settings, country_dir, global_dir, cache_dir, iso_code, country, username, password, progress_queue)
+        )
+        print("MAIN THREAD: Thread object created")
+        download_thread.daemon = True
+        download_thread.start()
+        print(f"MAIN THREAD: Thread started, alive: {download_thread.is_alive()}")
+
+        current_tasks[task_id] = download_thread
+
+        return redirect(url_for('progress', task_id=task_id))
+
+    except Exception as e:
+        print("MAIN THREAD: LayerSettings or thread failed:", str(e))
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
         # Create unique task ID
         task_id = f"task_{len(current_tasks)}"
