@@ -743,44 +743,11 @@ def refresh_dynamic_caches():
         # Find latest OSCAR data using CMR
         print("OSCAR: Searching for latest OSCAR data...")
 
-        # Try to find OSCAR data - first search for collections
-        print("OSCAR: Searching for OSCAR collections...")
-        collections_url = "https://cmr.earthdata.nasa.gov/search/collections.json"
-        collections_params = {
-            'keyword': 'OSCAR',
-            'provider': 'POCLOUD',
-            'page_size': '5'
-        }
+        # Use the known OSCAR collection ID directly
+        oscar_collection_id = 'C2102958977-POCLOUD'
+        print(f"OSCAR: Using collection ID: {oscar_collection_id}")
 
         headers = {"Authorization": f"Bearer {token}"}
-        response = requests.get(collections_url, params=collections_params, headers=headers, timeout=30)
-
-        if response.status_code == 401:
-            print("OSCAR: Authentication failed - token may be expired")
-            return False
-
-        if response.status_code != 200:
-            print(f"OSCAR: Collections search failed with status {response.status_code}")
-            print(f"OSCAR: Response: {response.text[:500]}")
-            return False
-
-        collections_data = response.json()
-        oscar_collection_id = None
-
-        if 'feed' in collections_data and 'entry' in collections_data['feed']:
-            for collection in collections_data['feed']['entry']:
-                if 'OSCAR' in collection.get('title', '').upper():
-                    oscar_collection_id = collection.get('id')
-                    print(f"OSCAR: Found collection: {collection.get('title')} (ID: {oscar_collection_id})")
-                    break
-
-        if not oscar_collection_id:
-            # Fallback to known OSCAR collection ID
-            oscar_collection_id = 'C2102958977-POCLOUD'
-            print(f"OSCAR: Using fallback collection ID: {oscar_collection_id}")
-
-        # Now search for granules in this collection
-        print(f"OSCAR: Searching for granules in collection {oscar_collection_id}")
         granules_url = "https://cmr.earthdata.nasa.gov/search/granules.json"
         granules_params = {
             'collection_concept_id': oscar_collection_id,

@@ -18,47 +18,39 @@ def refresh_static_caches():
         cache_dir = Path(__file__).parent.parent / "cache" / "static"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Try to download submarine cable data from public sources
-        cables_urls = [
-            "https://raw.githubusercontent.com/telegeography/www.submarinecablemap.com/master/public/cable-geo.json",
-            "https://www.submarinecablemap.com/api/v3/cables/all.json",
-            "https://api.submarinecablemap.com/v3/cables/all.json"
-        ]
-
+        # Download submarine cable data from the known working source
+        cables_url = "https://raw.githubusercontent.com/telegeography/www.submarinecablemap.com/master/public/cable-geo.json"
         cache_file = cache_dir / "cables_global.geojson"
 
-        for url in cables_urls:
-            try:
-                print(f"CABLES: Trying to download from {url}")
-                response = requests.get(url, timeout=60, headers={'User-Agent': 'Mozilla/5.0'})
+        print(f"CABLES: Downloading submarine cable data from {cables_url}")
+        try:
+            response = requests.get(cables_url, timeout=60, headers={'User-Agent': 'Mozilla/5.0'})
+            response.raise_for_status()
 
-                if response.status_code != 200:
-                    print(f"CABLES: HTTP {response.status_code} from {url}")
-                    continue
+            # Validate that we got JSON data
+            data = response.json()
 
-                # Validate that we got JSON data
-                try:
-                    data = response.json()
-                except json.JSONDecodeError:
-                    print(f"CABLES: Invalid JSON response from {url}")
-                    continue
+            if isinstance(data, dict) and 'features' in data:
+                with open(cache_file, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, indent=2)
 
-                if isinstance(data, (list, dict)) and len(str(data)) > 1000:  # Reasonable size check
-                    with open(cache_file, 'w', encoding='utf-8') as f:
-                        json.dump(data, f, indent=2)
+                print(f"CABLES: Downloaded submarine cable data, size = {cache_file.stat().st_size} bytes")
+            else:
+                print("CABLES: Invalid GeoJSON structure received")
+                return False
 
-                    print(f"CABLES: Downloaded submarine cable data, size = {cache_file.stat().st_size} bytes")
-                    break
-                else:
-                    print(f"CABLES: Response too small or invalid format from {url} (size: {len(str(data))})")
-                    continue
-            except requests.RequestException as e:
-                print(f"CABLES: Network error downloading from {url}: {e}")
-                continue
-            except Exception as e:
-                print(f"CABLES: Unexpected error downloading from {url}: {e}")
-                continue
-        else:
+        except requests.RequestException as e:
+            print(f"CABLES: Network error downloading cables: {e}")
+            return False
+        except json.JSONDecodeError as e:
+            print(f"CABLES: Invalid JSON response: {e}")
+            return False
+        except Exception as e:
+            print(f"CABLES: Unexpected error downloading cables: {e}")
+            return False
+
+        # If download succeeded, continue with success
+        print("CABLES: Static cache refreshed")
             # If all sources fail, create a minimal placeholder
             print("CABLES: All download sources failed, creating placeholder")
             placeholder_data = {

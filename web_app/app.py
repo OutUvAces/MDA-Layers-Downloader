@@ -120,24 +120,11 @@ def pregenerate_default_kmls():
     }
 
     # Process EEZ data for country-specific layers
-    eez_files = list(STATIC_CACHE_DIR.glob("eez_global.*"))
-    if eez_files:
-        eez_file = eez_files[0]
-        print(f"PREGENERATE: Loading EEZ data from {eez_file}")
-
-        try:
-            if eez_file.suffix == '.zip':
-                # Load from shapefile zip
-                import zipfile
-                import tempfile
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    with zipfile.ZipFile(eez_file, 'r') as zip_ref:
-                        zip_ref.extractall(temp_dir)
-                    shp_files = list(Path(temp_dir).glob("*.shp"))
-                    if shp_files:
-                        gdf = gpd.read_file(shp_files[0])
-            else:
-                gdf = gpd.read_file(eez_file)
+    marineregions_dir = STATIC_CACHE_DIR / "marineregions"
+    eez_gpkg = marineregions_dir / "World_EEZ_v12_20231025.gpkg"
+    if eez_gpkg.exists():
+        print(f"PREGENERATE: Loading EEZ data from {eez_gpkg}")
+        gdf = gpd.read_file(eez_gpkg)
 
             # Get unique countries from EEZ data
             if 'iso_ter1' in gdf.columns:
@@ -177,20 +164,18 @@ def pregenerate_default_kmls():
             print(f"PREGENERATE: Error processing EEZ data: {e}")
 
     # Process WDPA data for MPAs
-    wdpa_files = list(STATIC_CACHE_DIR.glob("mpa_global.*"))
+    wdpa_dir = STATIC_CACHE_DIR / "wdpa"
+    wdpa_files = list(wdpa_dir.glob("*.zip"))
     if wdpa_files:
         wdpa_file = wdpa_files[0]
         print(f"PREGENERATE: Processing MPA data from {wdpa_file}")
         try:
-            if wdpa_file.suffix == '.zip':
-                with tempfile.TemporaryDirectory() as temp_dir:
-                    with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
-                        zip_ref.extractall(temp_dir)
-                    shp_files = list(Path(temp_dir).glob("*.shp"))
-                    if shp_files:
-                        mpa_gdf = gpd.read_file(shp_files[0])
-            else:
-                mpa_gdf = gpd.read_file(wdpa_file)
+            with tempfile.TemporaryDirectory() as temp_dir:
+                with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
+                    zip_ref.extractall(temp_dir)
+                shp_files = list(Path(temp_dir).glob("*.shp"))
+                if shp_files:
+                    mpa_gdf = gpd.read_file(shp_files[0])
 
             # Generate country-specific MPA KMLs
             if 'iso3' in mpa_gdf.columns:

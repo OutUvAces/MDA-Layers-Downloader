@@ -40,26 +40,36 @@ def refresh_static_caches():
     print("MARINEREGIONS: Refreshing static caches...")
 
     try:
-        cache_dir = Path(__file__).parent.parent / "cache" / "static"
+        cache_dir = Path(__file__).parent.parent / "cache" / "static" / "marineregions"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Download EEZ data
-        print("MARINEREGIONS: Downloading EEZ data...")
-        eez_url = "https://www.marineregions.org/download_file.php?name=World_EEZ_v12_20231025.zip"
-        eez_zip = cache_dir / "eez_global.zip"
+        # Use the original MarineRegions download approach - download EEZ shapefile
+        print("MARINEREGIONS: Downloading EEZ global shapefile...")
+        eez_url = "https://www.marineregions.org/download_file.php?name=World_EEZ_v12_20231025_gpkg.zip"
+        eez_zip = cache_dir / "World_EEZ_v12_20231025_gpkg.zip"
 
-        response = requests.get(eez_url, timeout=120)
-        response.raise_for_status()
+        if not eez_zip.exists():
+            # Force disable SSL verification for MarineRegions (as in original code)
+            import urllib3
+            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-        with open(eez_zip, 'wb') as f:
-            f.write(response.content)
+            response = requests.get(eez_url, timeout=120, verify=False)
+            response.raise_for_status()
 
-        print(f"MARINEREGIONS: Downloaded EEZ data, size = {eez_zip.stat().st_size} bytes")
+            with open(eez_zip, 'wb') as f:
+                f.write(response.content)
 
-        # For other marine regions data, we could download additional datasets
-        # For now, we'll focus on EEZ as the primary static cache
-        # Territorial waters, contiguous zones, and ECS could be derived from EEZ data
-        # or downloaded from additional MarineRegions endpoints
+            print(f"MARINEREGIONS: Downloaded EEZ data, size = {eez_zip.stat().st_size} bytes")
+
+            # Extract the ZIP
+            print("MARINEREGIONS: Extracting EEZ data...")
+            import zipfile
+            with zipfile.ZipFile(eez_zip, 'r') as zip_ref:
+                zip_ref.extractall(cache_dir)
+
+            print("MARINEREGIONS: EEZ data extracted")
+        else:
+            print("MARINEREGIONS: EEZ data already downloaded")
 
         print("MARINEREGIONS: Static caches refreshed")
         return True

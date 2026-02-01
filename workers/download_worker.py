@@ -175,10 +175,10 @@ def worker(
     country_name: str,
     report_progress
 ):
-    """Main synchronous worker function for processing marine data layers.
+    """Main synchronous worker function for processing marine data layers using cache.
 
     Processes all enabled marine data layers for a specific country or region,
-    coordinating downloads and conversions to KML format.
+    using cached data and pre-generated KMLs for instant serving.
 
     Args:
         settings: Layer configuration settings
@@ -191,29 +191,101 @@ def worker(
         country_name: Full country name
         report_progress: Progress reporting callback function
     """
-    print("WORKER THREAD STARTED")
-    print(f"  settings.layers len = {len(settings.layers) if settings and hasattr(settings, 'layers') and settings.layers else 'None'}")
-    print(f"  country_output_dir type = {type(country_output_dir)}")
-    print(f"  global_output_dir type = {type(global_output_dir)}")
-    print(f"  cache_dir type = {type(cache_dir)}")
+    success = True  # Overall success tracker
+    country_path = Path(country_output_dir)
+    global_path = Path(global_output_dir)
+    cache_path = Path(cache_dir)
 
+    # Create output folders
     try:
-        country_path = Path(country_output_dir)
-        global_path = Path(global_output_dir)
-        cache_path = Path(cache_dir)
-
-        # Create output folders
-        try:
-            country_path.mkdir(exist_ok=True)
-            global_path.mkdir(exist_ok=True)
-        except Exception as e:
-            print(f"WORKER THREAD: Failed to create directories: {str(e)}")
-            report_progress(0, f"Directory creation failed: {str(e)}")
-            return False  # Early return on directory creation failure
+        country_path.mkdir(exist_ok=True)
+        global_path.mkdir(exist_ok=True)
     except Exception as e:
-        print(f"WORKER THREAD: Failed to create paths: {str(e)}")
-        report_progress(0, f"Path creation failed: {str(e)}")
+        print(f"WORKER THREAD: Failed to create directories: {str(e)}")
+        report_progress(0, f"Directory creation failed: {str(e)}")
         return False
+
+    # Build tasks based on settings
+    tasks = build_tasks(settings, country_path, global_path, iso_code, country_name)
+
+    print(f"WORKER THREAD: Processing {len(tasks)} tasks")
+
+    for task in tasks:
+        task_success = False  # Success for individual task
+        pregenerated_path = None  # Track if pre-generated KML is found
+
+        # Check for pre-generated KMLs first (for default styles)
+        if task.type in ("territorial", "contiguous", "eez", "ecs"):
+            # Country-specific layers
+            pregenerated_path = cache_path / "pregenerated" / "country" / iso_code / f"{task.type}.kml"
+            if pregenerated_path.exists():
+                print(f"WORKER THREAD: Using pre-generated {task.type} for {iso_code}")
+                import shutil
+                shutil.copy2(pregenerated_path, task.output_path)
+                task_success = True
+                report_progress(task.weight, f"✓ {task.name} served from pre-generated KML")
+            else:
+                print(f"WORKER THREAD: No pre-generated {task.type} found for {iso_code}")
+
+        elif task.type == "mpa":
+            # MPA layer
+            pregenerated_path = cache_path / "pregenerated" / "country" / iso_code / "mpa.kml"
+            if pregenerated_path.exists():
+                print(f"WORKER THREAD: Using pre-generated MPA for {iso_code}")
+                import shutil
+                shutil.copy2(pregenerated_path, task.output_path)
+                task_success = True
+                report_progress(task.weight, f"✓ {task.name} served from pre-generated KML")
+            else:
+                print(f"WORKER THREAD: No pre-generated MPA found for {iso_code}")
+
+        elif task.type == "cables":
+            # Global cables
+            pregenerated_path = cache_path / "pregenerated" / "global" / "cables.kml"
+            if pregenerated_path.exists():
+                print(f"WORKER THREAD: Using pre-generated cables")
+                import shutil
+                shutil.copy2(pregenerated_path, task.output_path)
+                task_success = True
+                report_progress(task.weight, f"✓ {task.name} served from pre-generated KML")
+            else:
+                print(f"WORKER THREAD: No pre-generated cables found")
+
+        elif task.type == "seastate":
+            # OSCAR currents (use same cached NetCDF, handled by clip_to_eez flag)
+            oscar_cache = cache_path / "dynamic" / "oscar_currents"
+            oscar_files = list(oscar_cache.glob("*.nc"))
+            if oscar_files:
+                oscar_file = max(oscar_files, key=lambda x: x.stat().st_mtime)
+                print(f"WORKER THREAD: Processing OSCAR from {oscar_file}")
+                try:
+                    # Import processing function
+                    from downloaders.oscar_currents import process
+                    task_success = process(task, report_progress, str(global_path.parent), str(cache_path))
+                except Exception as e:
+                    print(f"WORKER THREAD: OSCAR processing failed: {e}")
+                    report_progress(0, f"OSCAR processing error: {str(e)}")
+            else:
+                print("WORKER THREAD: No OSCAR cache available")
+                report_progress(0, "✗ OSCAR currents not available - cache refresh needed")
+
+        elif task.type == "navwarnings":
+            # Global nav warnings
+            pregenerated_path = cache_path / "pregenerated" / "global" / "nav_warnings.kml"
+            if pregenerated_path.exists():
+                print(f"WORKER THREAD: Using pre-generated nav warnings")
+                import shutil
+                shutil.copy2(pregenerated_path, task.output_path)
+                task_success = True
+                report_progress(task.weight, f"✓ {task.name} served from pre-generated KML")
+            else:
+                print(f"WORKER THREAD: No pre-generated nav warnings found")
+
+        if not task_success:
+            success = False  # Update overall success
+
+    print(f"WORKER THREAD: Final success = {success}")
+    return success
 
     try:
         # Create _metadata subfolder in both output directories and hide it
