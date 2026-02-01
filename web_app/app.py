@@ -122,11 +122,13 @@ def pregenerate_default_kmls():
 
     # Process EEZ data for country-specific layers
     marineregions_dir = STATIC_CACHE_DIR / "marineregions"
-    eez_file = marineregions_dir / "eez_global.geojson"
-    if eez_file.exists():
-        print(f"PREGENERATE: Loading EEZ data from {eez_file}")
+    # Look for extracted shapefile from the ZIP
+    shp_files = list(marineregions_dir.glob("*.shp"))
+    if shp_files:
+        eez_shp = shp_files[0]
+        print(f"PREGENERATE: Loading EEZ data from {eez_shp}")
         try:
-            gdf = gpd.read_file(eez_file)
+            gdf = gpd.read_file(eez_shp)
 
             # Get unique countries from EEZ data
             if 'iso_ter1' in gdf.columns:
@@ -177,6 +179,19 @@ def pregenerate_default_kmls():
                 print(f"PREGENERATE: Extracting WDPA ZIP to {temp_dir}")
                 with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
                     zip_ref.extractall(temp_dir)
+
+                # Check for direct shapefiles
+                shp_files = list(Path(temp_dir).glob("*.shp"))
+                if not shp_files:
+                    # Check for nested ZIP files
+                    nested_zips = list(Path(temp_dir).glob("*.zip"))
+                    print(f"PREGENERATE: Found {len(nested_zips)} nested ZIPs")
+                    for nested_zip in nested_zips[:1]:  # Just extract the first one for demo
+                        print(f"PREGENERATE: Extracting nested ZIP {nested_zip}")
+                        with zipfile.ZipFile(nested_zip, 'r') as inner_zip:
+                            inner_zip.extractall(temp_dir)
+                        break
+
                 shp_files = list(Path(temp_dir).glob("*.shp"))
                 print(f"PREGENERATE: Found {len(shp_files)} shapefiles: {[str(f) for f in shp_files]}")
                 if shp_files:

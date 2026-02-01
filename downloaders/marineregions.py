@@ -153,12 +153,12 @@ def refresh_static_caches():
         cache_dir = Path(__file__).parent.parent / "cache" / "static" / "marineregions"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Use WFS to download EEZ data as GeoJSON (similar to main branch approach)
-        print("MARINEREGIONS: Downloading EEZ data via WFS...")
-        eez_url = "https://geo.vliz.be/geoserver/MarineRegions/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=MarineRegions:eez&outputFormat=application/json"
-        eez_file = cache_dir / "eez_global.geojson"
+        # Download EEZ shapefile directly from MarineRegions
+        print("MARINEREGIONS: Downloading EEZ shapefile...")
+        eez_url = "https://www.marineregions.org/download_file.php?name=World_EEZ_v12_20231025.zip"
+        eez_zip = cache_dir / "eez_global.zip"
 
-        if not eez_file.exists():
+        if not eez_zip.exists():
             # Force disable SSL verification for MarineRegions (as in original code)
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -166,10 +166,18 @@ def refresh_static_caches():
             response = requests.get(eez_url, timeout=120, verify=False)
             response.raise_for_status()
 
-            with open(eez_file, 'w', encoding='utf-8') as f:
-                f.write(response.text)
+            with open(eez_zip, 'wb') as f:
+                f.write(response.content)
 
-            print(f"MARINEREGIONS: Downloaded EEZ data, size = {eez_file.stat().st_size} bytes")
+            print(f"MARINEREGIONS: Downloaded EEZ data, size = {eez_zip.stat().st_size} bytes")
+
+            # Extract the ZIP file
+            print("MARINEREGIONS: Extracting EEZ data...")
+            import zipfile
+            with zipfile.ZipFile(eez_zip, 'r') as zip_ref:
+                zip_ref.extractall(cache_dir)
+
+            print("MARINEREGIONS: EEZ data extracted")
         else:
             print("MARINEREGIONS: EEZ data already downloaded")
 
