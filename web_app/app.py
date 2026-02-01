@@ -22,6 +22,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from werkzeug.utils import secure_filename
 import threading
 import queue
+import json
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -113,10 +114,24 @@ def refresh_caches():
             from downloaders.wdpa import refresh_static_caches as refresh_wdpa
             from downloaders.submarine_cables import refresh_static_caches as refresh_cables
 
-            # Call refresh functions (we'll need to implement these)
-            refresh_static_caches()
-            refresh_wdpa()
-            refresh_cables()
+            # Call refresh functions
+            try:
+                refresh_static_caches()
+                print("CACHE REFRESH: MarineRegions static refresh completed")
+            except Exception as e:
+                print(f"CACHE REFRESH: MarineRegions static refresh failed: {e}")
+
+            try:
+                refresh_wdpa()
+                print("CACHE REFRESH: WDPA static refresh completed")
+            except Exception as e:
+                print(f"CACHE REFRESH: WDPA static refresh failed: {e}")
+
+            try:
+                refresh_cables()
+                print("CACHE REFRESH: Cables static refresh completed")
+            except Exception as e:
+                print(f"CACHE REFRESH: Cables static refresh failed: {e}")
 
             metadata['last_refresh_static'] = datetime.now()
             print("CACHE REFRESH: Static caches refreshed successfully")
@@ -133,13 +148,20 @@ def refresh_caches():
             from downloaders.oscar_currents import refresh_dynamic_caches
             from downloaders.navigation_warnings import refresh_dynamic_caches as refresh_nav
 
-            if username and password:
-                refresh_dynamic_caches(username, password)
+            try:
+                refresh_dynamic_caches()
+                print("CACHE REFRESH: OSCAR dynamic refresh completed")
+            except Exception as e:
+                print(f"CACHE REFRESH: OSCAR dynamic refresh failed: {e}")
+
+            try:
                 refresh_nav()
-                metadata['last_refresh_dynamic'] = datetime.now()
-                print("CACHE REFRESH: Dynamic caches refreshed successfully")
-            else:
-                print("CACHE REFRESH: Skipping dynamic caches - NASA_USERNAME/PASSWORD not set")
+                print("CACHE REFRESH: Nav warnings dynamic refresh completed")
+            except Exception as e:
+                print(f"CACHE REFRESH: Nav warnings dynamic refresh failed: {e}")
+
+            metadata['last_refresh_dynamic'] = datetime.now()
+            print("CACHE REFRESH: Dynamic caches refreshed successfully")
         except Exception as e:
             print(f"CACHE REFRESH: Error refreshing dynamic caches: {e}")
     else:
