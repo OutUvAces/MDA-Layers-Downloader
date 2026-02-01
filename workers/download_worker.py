@@ -191,10 +191,16 @@ def worker(
         country_name: Full country name
         report_progress: Progress reporting callback function
     """
-    print(f"WORKER THREAD STARTED for task with iso_code={iso_code}, country={country_name}")
-    print(f"WORKER THREAD: settings summary - territorial:{settings.territorial}, eez:{settings.eez}, mpa:{settings.mpa}")
+    print("WORKER THREAD STARTED")
+    print(f"  settings type={type(settings)}")
+    print(f"  country_output_dir={country_output_dir}, type={type(country_output_dir)}")
+    print(f"  global_output_dir={global_output_dir}, type={type(global_output_dir)}")
+    print(f"  cache_dir={cache_dir}, type={type(cache_dir)}")
+    print(f"  iso_code={iso_code}, country_name={country_name}")
+    print(f"  username={username}, password type={type(password)}")
 
-    country_path = Path(country_output_dir)
+    try:
+        country_path = Path(country_output_dir)
     global_path = Path(global_output_dir)
     cache_path = Path(cache_dir)
 
@@ -361,13 +367,24 @@ def worker(
         report_progress(0, "All selected layers already exist or have no data – no new files generated.")
 
     report_progress(0, f"\nCountry folder: {country_output_dir}")
-    report_progress(0, f"Global folder: {global_output_dir}")
-    # Send remaining progress to reach 100%
-    remaining = 100.0 - last_reported_pct
-    if remaining > 0:
-        report_progress(remaining, "\nDone!")
-    else:
-        report_progress(0, "\nDone!")
+        report_progress(0, f"Global folder: {global_output_dir}")
+        # Send remaining progress to reach 100%
+        remaining = 100.0 - last_reported_pct
+        if remaining > 0:
+            report_progress(remaining, "\nDone!")
+        else:
+            report_progress(0, "\nDone!")
+
+    except TypeError as e:
+        print("WORKER TYPE ERROR:", str(e))
+        import traceback
+        traceback.print_exc()
+        report_progress(0, f"Processing error: {str(e)}")
+    except Exception as e:
+        print("WORKER GENERAL ERROR:", str(e))
+        import traceback
+        traceback.print_exc()
+        report_progress(0, f"Processing error: {str(e)}")
 
 async def worker_async(
     settings: LayerSettings,

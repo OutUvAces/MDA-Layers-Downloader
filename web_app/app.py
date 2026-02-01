@@ -378,7 +378,14 @@ def start_download():
         }
 
         # Start the download task in a background thread
-        print(f"MAIN THREAD: Launching worker for task {task_id} with iso_code={iso_code}")
+        print("MAIN THREAD: Starting download task")
+        print(f"  task_id={task_id}")
+        print(f"  settings type={type(layer_settings)}")
+        print(f"  country_dir={country_dir}, type={type(country_dir)}")
+        print(f"  global_dir={global_dir}, type={type(global_dir)}")
+        print(f"  cache_dir={cache_dir}, type={type(cache_dir)}")
+        print(f"  iso_code={iso_code}, country_name={country}")
+        print(f"  username={username}, password_len={len(password) if password else 'None'}")
 
         download_thread = threading.Thread(
             target=run_download_task,
