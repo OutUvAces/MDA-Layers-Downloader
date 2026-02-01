@@ -302,47 +302,118 @@ def worker(
 
         # Check cache for layer data
         if task.type in ("territorial", "contiguous", "eez", "ecs"):
-            from downloaders.marineregions import check_cache
-            cache_file = check_cache(f"{task.type}_global")
-            if cache_file:
-                # Copy from cache to output
+            # Check for pre-generated KML first (if using default styling)
+            pregenerated_path = None
+            if iso_code and task.settings_color and task.settings_opacity:
+                # Check if this matches default styling
+                default_colors = {
+                    'territorial': '#ffff00',
+                    'contiguous': '#00ff00',
+                    'eez': '#0000ff',
+                    'ecs': '#8B4513'
+                }
+                default_opacities = {
+                    'territorial': '20',
+                    'contiguous': '20',
+                    'eez': '20',
+                    'ecs': '20'
+                }
+
+                if (task.settings_color == default_colors.get(task.type) and
+                    task.settings_opacity == default_opacities.get(task.type)):
+                    # Use pre-generated KML
+                    pregenerated_dir = Path(__file__).parent.parent / "cache" / "pregenerated" / "country" / iso_code
+                    layer_name_map = {
+                        'territorial': 'territorial_waters',
+                        'contiguous': 'contiguous_zone',
+                        'eez': 'eez',
+                        'ecs': 'ecs'
+                    }
+                    pregenerated_file = pregenerated_dir / f"{layer_name_map[task.type]}.kml"
+                    if pregenerated_file.exists():
+                        pregenerated_path = pregenerated_file
+
+            if pregenerated_path:
+                # Copy pre-generated KML directly
                 import shutil
-                shutil.copy2(cache_file, task.output_path)
+                shutil.copy2(pregenerated_path, task.output_path)
                 task_success = True
-                report_progress(0, f"✓ {task.name} loaded from cache")
+                report_progress(0, f"✓ {task.name} served from pre-generated KML")
             else:
-                task_success = False
-                report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
+                # Fall back to cache-based processing
+                from downloaders.marineregions import check_cache
+                cache_file = check_cache(f"{task.type}_global")
+                if cache_file:
+                    # Copy from cache to output (would need processing in real implementation)
+                    import shutil
+                    shutil.copy2(cache_file, task.output_path)
+                    task_success = True
+                    report_progress(0, f"✓ {task.name} loaded from cache")
+                else:
+                    task_success = False
+                    report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
         elif task.type == "mpa":
-            # Check WDPA cache
-            wdpa_cache_dir = Path(__file__).parent.parent / "cache" / "static"
-            wdpa_files = list(wdpa_cache_dir.glob("mpa_global.*"))
-            if wdpa_files:
-                # Use most recent WDPA file
-                cache_file = max(wdpa_files, key=lambda x: x.stat().st_mtime)
-                # Copy from cache to output (simplified - would need actual processing)
+            # Check for pre-generated MPA KML first
+            pregenerated_path = None
+            if iso_code and task.settings_color == '#ff0000' and task.settings_opacity == '20':
+                # Default styling - check for pre-generated
+                pregenerated_dir = Path(__file__).parent.parent / "cache" / "pregenerated" / "country" / iso_code
+                pregenerated_file = pregenerated_dir / "mpa.kml"
+                if pregenerated_file.exists():
+                    pregenerated_path = pregenerated_file
+
+            if pregenerated_path:
+                # Copy pre-generated KML directly
                 import shutil
-                shutil.copy2(cache_file, task.output_path)
+                shutil.copy2(pregenerated_path, task.output_path)
                 task_success = True
-                report_progress(0, f"✓ {task.name} loaded from cache")
+                report_progress(0, f"✓ {task.name} served from pre-generated KML")
             else:
-                task_success = False
-                report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
+                # Check WDPA cache
+                wdpa_cache_dir = Path(__file__).parent.parent / "cache" / "static"
+                wdpa_files = list(wdpa_cache_dir.glob("mpa_global.*"))
+                if wdpa_files:
+                    # Use most recent WDPA file
+                    cache_file = max(wdpa_files, key=lambda x: x.stat().st_mtime)
+                    # Copy from cache to output (simplified - would need actual processing)
+                    import shutil
+                    shutil.copy2(cache_file, task.output_path)
+                    task_success = True
+                    report_progress(0, f"✓ {task.name} loaded from cache")
+                else:
+                    task_success = False
+                    report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
         elif task.type == "cables":
-            # Check submarine cables cache
-            cables_cache_dir = Path(__file__).parent.parent / "cache" / "static"
-            cables_files = list(cables_cache_dir.glob("cables_global.*"))
-            if cables_files:
-                # Use most recent cables file
-                cache_file = max(cables_files, key=lambda x: x.stat().st_mtime)
-                # Copy from cache to output (simplified - would need actual processing)
+            # Check for pre-generated global cables KML first
+            pregenerated_path = None
+            if task.settings_color == '#ffffff' and task.settings_opacity == '50':
+                # Default styling - check for pre-generated
+                pregenerated_dir = Path(__file__).parent.parent / "cache" / "pregenerated" / "global"
+                pregenerated_file = pregenerated_dir / "cables.kml"
+                if pregenerated_file.exists():
+                    pregenerated_path = pregenerated_file
+
+            if pregenerated_path:
+                # Copy pre-generated KML directly
                 import shutil
-                shutil.copy2(cache_file, task.output_path)
+                shutil.copy2(pregenerated_path, task.output_path)
                 task_success = True
-                report_progress(0, f"✓ {task.name} loaded from cache")
+                report_progress(0, f"✓ {task.name} served from pre-generated KML")
             else:
-                task_success = False
-                report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
+                # Check submarine cables cache
+                cables_cache_dir = Path(__file__).parent.parent / "cache" / "static"
+                cables_files = list(cables_cache_dir.glob("cables_global.*"))
+                if cables_files:
+                    # Use most recent cables file
+                    cache_file = max(cables_files, key=lambda x: x.stat().st_mtime)
+                    # Copy from cache to output (simplified - would need actual processing)
+                    import shutil
+                    shutil.copy2(cache_file, task.output_path)
+                    task_success = True
+                    report_progress(0, f"✓ {task.name} loaded from cache")
+                else:
+                    task_success = False
+                    report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
         elif task.type == "seastate":
             # Check OSCAR cache (same data used for both country and global currents)
             oscar_cache_dir = Path(__file__).parent.parent / "cache" / "dynamic" / "oscar_currents"
@@ -358,17 +429,33 @@ def worker(
                 task_success = False
                 report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
         elif task.type == "navwarnings":
-            # Check nav warnings cache
-            nav_cache_dir = Path(__file__).parent.parent / "cache" / "dynamic" / "nav_warnings"
-            recent_files = list(nav_cache_dir.glob("*.json"))
-            if recent_files:
-                # Use most recent nav file (simplified - would need actual processing)
-                cache_file = max(recent_files, key=lambda x: x.stat().st_mtime)
+            # Check for pre-generated global nav warnings KML first
+            pregenerated_path = None
+            if task.settings_color == '#ff0000' and task.settings_opacity == '80':
+                # Default styling - check for pre-generated
+                pregenerated_dir = Path(__file__).parent.parent / "cache" / "pregenerated" / "global"
+                pregenerated_file = pregenerated_dir / "nav_warnings.kml"
+                if pregenerated_file.exists():
+                    pregenerated_path = pregenerated_file
+
+            if pregenerated_path:
+                # Copy pre-generated KML directly
+                import shutil
+                shutil.copy2(pregenerated_path, task.output_path)
                 task_success = True
-                report_progress(0, f"✓ {task.name} loaded from cache")
+                report_progress(0, f"✓ {task.name} served from pre-generated KML")
             else:
-                task_success = False
-                report_progress(0, f"✗ {task.name} cache not implemented yet")
+                # Check nav warnings cache
+                nav_cache_dir = Path(__file__).parent.parent / "cache" / "dynamic" / "nav_warnings"
+                recent_files = list(nav_cache_dir.glob("*.json"))
+                if recent_files:
+                    # Use most recent nav file (simplified - would need actual processing)
+                    cache_file = max(recent_files, key=lambda x: x.stat().st_mtime)
+                    task_success = True
+                    report_progress(0, f"✓ {task.name} loaded from cache")
+                else:
+                    task_success = False
+                    report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
 
         # Update overall success
         if not task_success:

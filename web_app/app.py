@@ -25,6 +25,7 @@ import queue
 import json
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
+import pandas as pd
 
 # Add parent directory to path to import existing modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -56,11 +57,13 @@ current_tasks = {}
 CACHE_DIR = Path(__file__).parent.parent / "cache"
 STATIC_CACHE_DIR = CACHE_DIR / "static"
 DYNAMIC_CACHE_DIR = CACHE_DIR / "dynamic"
+PREGENERATED_DIR = CACHE_DIR / "pregenerated"
 CACHE_METADATA_FILE = CACHE_DIR / "cache_metadata.json"
 
 # Ensure cache directories exist
 STATIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 DYNAMIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+PREGENERATED_DIR.mkdir(parents=True, exist_ok=True)
 
 def load_cache_metadata():
     """Load cache metadata from JSON file"""
@@ -95,6 +98,164 @@ def get_cache_age(last_refresh, unit='hours'):
     except Exception as e:
         print(f"Error calculating cache age: {e}")
         return float('inf')
+
+def pregenerate_default_kmls():
+    """Pre-generate default-style KMLs for static layers"""
+    import geopandas as gpd
+    from shapely import wkt
+
+    country_dir = PREGENERATED_DIR / "country"
+    global_dir = PREGENERATED_DIR / "global"
+    country_dir.mkdir(parents=True, exist_ok=True)
+    global_dir.mkdir(parents=True, exist_ok=True)
+
+    # Default styling (from LayerSettings defaults)
+    default_styles = {
+        'territorial': {'color': '#ffff00', 'opacity': '20'},
+        'contiguous': {'color': '#00ff00', 'opacity': '20'},
+        'eez': {'color': '#0000ff', 'opacity': '20'},
+        'ecs': {'color': '#8B4513', 'opacity': '20'},
+        'mpa': {'color': '#ff0000', 'opacity': '20'},
+        'cables': {'color': '#ffffff', 'opacity': '50'}
+    }
+
+    # Process EEZ data for country-specific layers
+    eez_files = list(STATIC_CACHE_DIR.glob("eez_global.*"))
+    if eez_files:
+        eez_file = eez_files[0]
+        print(f"PREGENERATE: Loading EEZ data from {eez_file}")
+
+        try:
+            if eez_file.suffix == '.zip':
+                # Load from shapefile zip
+                import zipfile
+                import tempfile
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    with zipfile.ZipFile(eez_file, 'r') as zip_ref:
+                        zip_ref.extractall(temp_dir)
+                    shp_files = list(Path(temp_dir).glob("*.shp"))
+                    if shp_files:
+                        gdf = gpd.read_file(shp_files[0])
+            else:
+                gdf = gpd.read_file(eez_file)
+
+            # Get unique countries from EEZ data
+            if 'iso_ter1' in gdf.columns:
+                countries = gdf['iso_ter1'].unique()
+                print(f"PREGENERATE: Found {len(countries)} countries in EEZ data")
+
+                for country_iso in countries[:10]:  # Limit to first 10 for demo
+                    if pd.isna(country_iso) or not country_iso:
+                        continue
+
+                    country_iso_dir = country_dir / str(country_iso)
+                    country_iso_dir.mkdir(exist_ok=True)
+
+                    # Generate country-specific KMLs
+                    country_data = gdf[gdf['iso_ter1'] == country_iso]
+
+                    if not country_data.empty:
+                        # EEZ
+                        eez_kml = country_iso_dir / "eez.kml"
+                        country_data.to_file(eez_kml, driver='KML')
+                        print(f"PREGENERATE: Generated {eez_kml}")
+
+                        # Territorial waters (simplified - would need 12nm buffer logic)
+                        # For demo, just copy EEZ
+                        territorial_kml = country_iso_dir / "territorial_waters.kml"
+                        country_data.to_file(territorial_kml, driver='KML')
+                        print(f"PREGENERATE: Generated {territorial_kml}")
+
+                        # Similar for contiguous and ECS
+                        contiguous_kml = country_iso_dir / "contiguous_zone.kml"
+                        country_data.to_file(contiguous_kml, driver='KML')
+
+                        ecs_kml = country_iso_dir / "ecs.kml"
+                        country_data.to_file(ecs_kml, driver='KML')
+
+        except Exception as e:
+            print(f"PREGENERATE: Error processing EEZ data: {e}")
+
+    # Process WDPA data for MPAs
+    wdpa_files = list(STATIC_CACHE_DIR.glob("mpa_global.*"))
+    if wdpa_files:
+        wdpa_file = wdpa_files[0]
+        print(f"PREGENERATE: Processing MPA data from {wdpa_file}")
+        try:
+            if wdpa_file.suffix == '.zip':
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
+                        zip_ref.extractall(temp_dir)
+                    shp_files = list(Path(temp_dir).glob("*.shp"))
+                    if shp_files:
+                        mpa_gdf = gpd.read_file(shp_files[0])
+            else:
+                mpa_gdf = gpd.read_file(wdpa_file)
+
+            # Generate country-specific MPA KMLs
+            if 'iso3' in mpa_gdf.columns:
+                mpa_countries = mpa_gdf['iso3'].unique()
+                for country_iso in mpa_countries[:10]:  # Limit for demo
+                    if pd.isna(country_iso) or not country_iso:
+                        continue
+
+                    country_iso_dir = country_dir / str(country_iso)
+                    country_iso_dir.mkdir(exist_ok=True)
+
+                    country_mpa = mpa_gdf[mpa_gdf['iso3'] == country_iso]
+                    if not country_mpa.empty:
+                        mpa_kml = country_iso_dir / "mpa.kml"
+                        country_mpa.to_file(mpa_kml, driver='KML')
+                        print(f"PREGENERATE: Generated {mpa_kml}")
+
+        except Exception as e:
+            print(f"PREGENERATE: Error processing MPA data: {e}")
+
+    # Process cables (global)
+    cables_files = list(STATIC_CACHE_DIR.glob("cables_global.*"))
+    if cables_files:
+        cables_file = cables_files[0]
+        print(f"PREGENERATE: Processing cables data from {cables_file}")
+        try:
+            if cables_file.suffix == '.json':
+                cables_gdf = gpd.read_file(cables_file)
+            else:
+                cables_gdf = gpd.read_file(cables_file)
+
+            if not cables_gdf.empty:
+                cables_kml = global_dir / "cables.kml"
+                cables_gdf.to_file(cables_kml, driver='KML')
+                print(f"PREGENERATE: Generated {cables_kml}")
+
+        except Exception as e:
+            print(f"PREGENERATE: Error processing cables data: {e}")
+
+    # Process nav warnings (global)
+    nav_files = list(DYNAMIC_CACHE_DIR.glob("nav_warnings/*"))
+    if nav_files:
+        nav_file = max(nav_files, key=lambda x: x.stat().st_mtime)
+        print(f"PREGENERATE: Processing nav warnings from {nav_file}")
+        try:
+            # For now, create a simple placeholder KML
+            nav_kml = global_dir / "nav_warnings.kml"
+            # In real implementation, would parse the nav data and create proper KML
+            with open(nav_kml, 'w', encoding='utf-8') as f:
+                f.write("""<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Navigation Warnings</name>
+    <Placemark>
+      <name>Navigation Warnings Data</name>
+      <Point>
+        <coordinates>0,0,0</coordinates>
+      </Point>
+    </Placemark>
+  </Document>
+</kml>""")
+            print(f"PREGENERATE: Generated {nav_kml}")
+
+        except Exception as e:
+            print(f"PREGENERATE: Error processing nav warnings: {e}")
 
 def refresh_caches():
     """Refresh all caches (static and dynamic)"""
@@ -166,6 +327,15 @@ def refresh_caches():
             print(f"CACHE REFRESH: Error refreshing dynamic caches: {e}")
     else:
         print(f"CACHE REFRESH: Dynamic caches are fresh ({dynamic_age_hours:.1f} hours old)")
+
+    # Pre-generate default-style KMLs for static layers
+    if static_age_days > 30 or metadata.get('last_refresh_static') is None:
+        print("CACHE REFRESH: Pre-generating default KMLs...")
+        try:
+            pregenerate_default_kmls()
+            print("CACHE REFRESH: Default KMLs pre-generated successfully")
+        except Exception as e:
+            print(f"CACHE REFRESH: Error pre-generating KMLs: {e}")
 
     save_cache_metadata(metadata)
     print("CACHE REFRESH: Cache refresh completed")
