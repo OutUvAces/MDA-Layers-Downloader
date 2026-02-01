@@ -22,9 +22,27 @@ class LayerSettings:
     def __post_init__(self):
         """Post-initialization hook for diagnostics"""
         print("LayerSettings __post_init__: Checking fields...")
-        # Check if any field that might be used with len() is None
-        if hasattr(self, 'layers') and self.layers is None:
-            print("LayerSettings WARNING: layers field is None")
+
+        # Check all fields that might be used with len()
+        fields_to_check = ['layers', 'territorial_color', 'eez_color', 'contiguous_color', 'mpa_color',
+                          'ecs_color', 'cables_color', 'seastate_color', 'navwarnings_color',
+                          'territorial_opacity', 'eez_opacity', 'contiguous_opacity', 'mpa_opacity',
+                          'ecs_opacity', 'cables_opacity', 'seastate_opacity', 'navwarnings_opacity']
+
+        for field_name in fields_to_check:
+            if hasattr(self, field_name):
+                value = getattr(self, field_name)
+                print(f"LayerSettings field {field_name} = {value}, type = {type(value)}")
+                if value is None:
+                    print(f"LayerSettings WARNING: {field_name} field is None")
+                elif hasattr(value, '__len__'):  # Check if it has len()
+                    try:
+                        length = len(value)
+                        print(f"LayerSettings {field_name} len = {length}")
+                    except TypeError as e:
+                        print(f"LayerSettings ERROR: len() failed on {field_name}: {e}")
+            else:
+                print(f"LayerSettings field {field_name} does not exist")
 
     # Layer enable/disable flags
     territorial: bool
