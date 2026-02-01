@@ -124,7 +124,8 @@ def pregenerate_default_kmls():
     eez_gpkg = marineregions_dir / "World_EEZ_v12_20231025.gpkg"
     if eez_gpkg.exists():
         print(f"PREGENERATE: Loading EEZ data from {eez_gpkg}")
-        gdf = gpd.read_file(eez_gpkg)
+        try:
+            gdf = gpd.read_file(eez_gpkg)
 
             # Get unique countries from EEZ data
             if 'iso_ter1' in gdf.columns:
