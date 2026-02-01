@@ -192,12 +192,10 @@ def worker(
         report_progress: Progress reporting callback function
     """
     print("WORKER THREAD STARTED")
-    print(f"  settings type={type(settings)}")
-    print(f"  country_output_dir={country_output_dir}, type={type(country_output_dir)}")
-    print(f"  global_output_dir={global_output_dir}, type={type(global_output_dir)}")
-    print(f"  cache_dir={cache_dir}, type={type(cache_dir)}")
-    print(f"  iso_code={iso_code}, country_name={country_name}")
-    print(f"  username={username}, password type={type(password)}")
+    print(f"  settings.layers len = {len(settings.layers) if settings and hasattr(settings, 'layers') and settings.layers else 'None'}")
+    print(f"  country_output_dir type = {type(country_output_dir)}")
+    print(f"  global_output_dir type = {type(global_output_dir)}")
+    print(f"  cache_dir type = {type(cache_dir)}")
 
     try:
         country_path = Path(country_output_dir)
@@ -216,6 +214,8 @@ def worker(
         print(f"WORKER THREAD: Failed to create paths: {str(e)}")
         report_progress(0, f"Path creation failed: {str(e)}")
         return False
+
+    try:
 
     # Create _metadata subfolder in both output directories and hide it
     for out_dir_str in [country_output_dir, global_output_dir]:
@@ -378,6 +378,17 @@ def worker(
             report_progress(remaining, "\nDone!")
         else:
             report_progress(0, "\nDone!")
+
+    except TypeError as e:
+        print("WORKER TYPE ERROR:", str(e))
+        import traceback
+        traceback.print_exc()
+        report_progress(0, f"Processing error: {str(e)}")
+    except Exception as e:
+        print("WORKER GENERAL ERROR:", str(e))
+        import traceback
+        traceback.print_exc()
+        report_progress(0, f"Processing error: {str(e)}")
 
 async def worker_async(
     settings: LayerSettings,
