@@ -12,7 +12,6 @@ cache/
 *.meta
 
 # IDE
-.cursor/
 .vscode/
 .idea/
 
