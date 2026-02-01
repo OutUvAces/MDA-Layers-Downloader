@@ -23,9 +23,13 @@ from werkzeug.utils import secure_filename
 import threading
 import queue
 import json
+import requests
 from datetime import datetime, timedelta
 from apscheduler.schedulers.background import BackgroundScheduler
 import pandas as pd
+
+# Import config constants
+COUNTRIES_JSON_URL = "https://geo.vliz.be/geoserver/MarineRegions/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=MarineRegions:eez_12nm&outputFormat=application/json&propertyName=territory1,iso_ter1"
 
 # Add parent directory to path to import existing modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -64,6 +68,124 @@ CACHE_METADATA_FILE = CACHE_DIR / "cache_metadata.json"
 STATIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 DYNAMIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 PREGENERATED_DIR.mkdir(parents=True, exist_ok=True)
+
+def load_countries():
+    """Load country list from MarineRegions API.
+
+    Returns:
+        List of tuples containing (country_name, iso_code) for all countries.
+    """
+    try:
+        response = requests.get(COUNTRIES_JSON_URL, timeout=20)
+        response.raise_for_status()
+        data = response.json()
+        country_list = []
+        for feature in data.get('features', []):
+            props = feature.get('properties', {})
+            territory = props.get('territory1')
+            iso = props.get('iso_ter1')
+            if territory and iso:
+                country_list.append((territory, iso))
+        # Sort by country name
+        country_list.sort(key=lambda x: x[0])
+        return country_list
+    except Exception as e:
+        print(f"Error loading countries: {e}")
+        # Fallback to basic list if API fails
+        return [
+            ("Japan", "JPN"),
+            ("United States", "USA"),
+            ("China", "CHN"),
+            ("South Korea", "KOR"),
+            ("Russia", "RUS"),
+            ("Philippines", "PHL"),
+            ("Vietnam", "VNM"),
+            ("Malaysia", "MYS"),
+            ("Indonesia", "IDN"),
+            ("Australia", "AUS"),
+            ("New Zealand", "NZL"),
+            ("United Kingdom", "GBR"),
+            ("France", "FRA"),
+            ("Germany", "DEU"),
+            ("Norway", "NOR"),
+            ("Canada", "CAN"),
+            ("Mexico", "MEX"),
+            ("Brazil", "BRA"),
+            ("Argentina", "ARG"),
+            ("Chile", "CHL"),
+            ("Peru", "PER"),
+            ("Ecuador", "ECU"),
+            ("Colombia", "COL"),
+            ("Panama", "PAN"),
+            ("Cuba", "CUB"),
+            ("Jamaica", "JAM"),
+            ("Bahamas", "BHS"),
+            ("Haiti", "HTI"),
+            ("Dominican Republic", "DOM"),
+            ("Puerto Rico", "PRI"),
+            ("Trinidad and Tobago", "TTO"),
+            ("Barbados", "BRB"),
+            ("Grenada", "GRD"),
+            ("Saint Lucia", "LCA"),
+            ("Saint Vincent and the Grenadines", "VCT"),
+            ("Antigua and Barbuda", "ATG"),
+            ("Saint Kitts and Nevis", "KNA"),
+            ("Dominica", "DMA"),
+            ("Montserrat", "MSR"),
+            ("Anguilla", "AIA"),
+            ("British Virgin Islands", "VGB"),
+            ("United States Virgin Islands", "VIR"),
+            ("Turks and Caicos Islands", "TCA"),
+            ("Cayman Islands", "CYM"),
+            ("Bermuda", "BMU"),
+            ("Greenland", "GRL"),
+            ("Iceland", "ISL"),
+            ("Faroe Islands", "FRO"),
+            ("Portugal", "PRT"),
+            ("Spain", "ESP"),
+            ("Italy", "ITA"),
+            ("Greece", "GRC"),
+            ("Turkey", "TUR"),
+            ("Egypt", "EGY"),
+            ("Israel", "ISR"),
+            ("Lebanon", "LBN"),
+            ("Syria", "SYR"),
+            ("Cyprus", "CYP"),
+            ("Malta", "MLT"),
+            ("Tunisia", "TUN"),
+            ("Algeria", "DZA"),
+            ("Morocco", "MAR"),
+            ("Libya", "LBY"),
+            ("Sudan", "SDN"),
+            ("Eritrea", "ERI"),
+            ("Djibouti", "DJI"),
+            ("Somalia", "SOM"),
+            ("Kenya", "KEN"),
+            ("Tanzania", "TZA"),
+            ("Mozambique", "MOZ"),
+            ("South Africa", "ZAF"),
+            ("Namibia", "NAM"),
+            ("Angola", "AGO"),
+            ("Democratic Republic of the Congo", "COD"),
+            ("Republic of the Congo", "COG"),
+            ("Gabon", "GAB"),
+            ("Equatorial Guinea", "GNQ"),
+            ("São Tomé and Príncipe", "STP"),
+            ("Cameroon", "CMR"),
+            ("Nigeria", "NGA"),
+            ("Benin", "BEN"),
+            ("Togo", "TGO"),
+            ("Ghana", "GHA"),
+            ("Côte d'Ivoire", "CIV"),
+            ("Liberia", "LBR"),
+            ("Sierra Leone", "SLE"),
+            ("Guinea", "GIN"),
+            ("Guinea-Bissau", "GNB"),
+            ("Gambia", "GMB"),
+            ("Senegal", "SEN"),
+            ("Mauritania", "MRT"),
+            ("Cape Verde", "CPV"),
+        ]
 
 def load_cache_metadata():
     """Load cache metadata from JSON file"""
@@ -207,6 +329,7 @@ def pregenerate_default_kmls():
                     print(f"PREGENERATE: Reading shapefile {polygons_shp}")
                     mpa_gdf = gpd.read_file(polygons_shp)
                     print(f"PREGENERATE: Loaded {len(mpa_gdf)} MPA features")
+                    print(f"PREGENERATE: MPA columns: {list(mpa_gdf.columns)}")
                 else:
                     print("PREGENERATE: No shapefiles found in extracted ZIP")
 
@@ -247,10 +370,18 @@ def pregenerate_default_kmls():
             with open(cables_file, 'r', encoding='utf-8') as f:
                 cables_data = json.load(f)
 
-            # Fix potential duplicate IDs by adding unique IDs
+            # Fix potential duplicate IDs by adding unique IDs and ensuring no duplicates
+            seen_ids = set()
             for i, feature in enumerate(cables_data.get('features', [])):
-                if 'id' not in feature:
-                    feature['id'] = f"cable_{i}"
+                original_id = feature.get('id', f"cable_{i}")
+                # Ensure unique ID
+                unique_id = original_id
+                counter = 1
+                while unique_id in seen_ids:
+                    unique_id = f"{original_id}_{counter}"
+                    counter += 1
+                feature['id'] = unique_id
+                seen_ids.add(unique_id)
 
             # Save fixed version
             fixed_cables_file = cables_file.parent / "cables_global_fixed.geojson"
@@ -258,12 +389,30 @@ def pregenerate_default_kmls():
                 json.dump(cables_data, f, indent=2)
 
             cables_gdf = gpd.read_file(fixed_cables_file)
-            print(f"PREGENERATE: Loaded {len(cables_gdf)} cable features")
+            print(f"PREGENERATE: Loaded {len(cables_gdf)} cable features with unique IDs")
 
             if not cables_gdf.empty:
                 cables_kml = global_dir / "cables.kml"
-                cables_gdf.to_file(cables_kml, driver='KML')
-                print(f"PREGENERATE: Generated {cables_kml}")
+                try:
+                    cables_gdf.to_file(cables_kml, driver='KML')
+                    print(f"PREGENERATE: Generated {cables_kml}")
+                except Exception as kml_error:
+                    print(f"PREGENERATE: KML generation failed: {kml_error}")
+                    # Try alternative approach - simplekml
+                    try:
+                        import simplekml
+                        kml = simplekml.Kml()
+                        for idx, row in cables_gdf.iterrows():
+                            geom = row.geometry
+                            if hasattr(geom, 'coords'):
+                                coords = list(geom.coords)
+                                if len(coords) >= 2:
+                                    line = kml.newlinestring(name=f"Cable_{idx}")
+                                    line.coords = coords
+                        kml.save(str(cables_kml))
+                        print(f"PREGENERATE: Generated {cables_kml} using simplekml")
+                    except Exception as simple_error:
+                        print(f"PREGENERATE: SimpleKML fallback also failed: {simple_error}")
 
         except Exception as e:
             print(f"PREGENERATE: Error processing cables data: {e}")
@@ -429,7 +578,11 @@ def index():
         'last_static': metadata.get('last_refresh_static'),
         'last_dynamic': metadata.get('last_refresh_dynamic')
     }
-    return render_template('index.html', cache_status=cache_status)
+
+    # Load countries for dropdown
+    countries = load_countries()
+
+    return render_template('index.html', cache_status=cache_status, countries=countries)
 
 @app.route('/cache_status')
 def cache_status():
@@ -447,53 +600,19 @@ def get_iso_code():
     """API endpoint to get ISO code for a country"""
     country = request.args.get('country', '')
 
-    # Country to ISO code mapping
-    iso_map = {
-        'Japan': 'JPN',
-        'United States': 'USA',
-        'China': 'CHN',
-        'South Korea': 'KOR',
-        'Russia': 'RUS',
-        'Philippines': 'PHL',
-        'Vietnam': 'VNM',
-        'Malaysia': 'MYS',
-        'Indonesia': 'IDN',
-        'France': 'FRA',
-        'Germany': 'DEU',
-        'United Kingdom': 'GBR',
-        'Italy': 'ITA',
-        'Spain': 'ESP',
-        'Canada': 'CAN',
-        'Australia': 'AUS',
-        'Brazil': 'BRA',
-        'India': 'IND',
-        'Mexico': 'MEX',
-        'Netherlands': 'NLD',
-        'Belgium': 'BEL',
-        'Switzerland': 'CHE',
-        'Austria': 'AUT',
-        'Sweden': 'SWE',
-        'Norway': 'NOR',
-        'Denmark': 'DNK',
-        'Finland': 'FIN',
-        'Poland': 'POL',
-        'Czech Republic': 'CZE',
-        'Hungary': 'HUN',
-        'Portugal': 'PRT',
-        'Greece': 'GRC',
-        'Turkey': 'TUR',
-        'South Africa': 'ZAF',
-        'Egypt': 'EGY',
-        'Israel': 'ISR',
-        'Saudi Arabia': 'SAU',
-        'United Arab Emirates': 'ARE',
-        'Singapore': 'SGP',
-        'Thailand': 'THA',
-        'New Zealand': 'NZL'
-    }
+    # Load countries and find matching ISO code
+    countries = load_countries()
+    for country_name, iso_code in countries:
+        if country_name == country:
+            return jsonify({'iso_code': iso_code})
 
-    iso_code = iso_map.get(country, '')
-    return jsonify({'iso_code': iso_code})
+    # If not found, try to extract from parenthetical in the display name
+    # (e.g., "Japan (JPN)" -> extract "JPN")
+    if ' (' in country and country.endswith(')'):
+        iso_code = country.split(' (')[-1].rstrip(')')
+        return jsonify({'iso_code': iso_code})
+
+    return jsonify({'iso_code': ''})
 
 @app.route('/start_download', methods=['POST'])
 def start_download():

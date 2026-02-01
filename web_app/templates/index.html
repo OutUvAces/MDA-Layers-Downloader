@@ -47,16 +47,9 @@
                                 <label for="country" class="form-label">Country</label>
                                 <select class="form-select" id="country" name="country" required>
                                     <option value="">Select a country...</option>
-                                    <option value="Japan">Japan</option>
-                                    <option value="United States">United States</option>
-                                    <option value="China">China</option>
-                                    <option value="South Korea">South Korea</option>
-                                    <option value="Russia">Russia</option>
-                                    <option value="Philippines">Philippines</option>
-                                    <option value="Vietnam">Vietnam</option>
-                                    <option value="Malaysia">Malaysia</option>
-                                    <option value="Indonesia">Indonesia</option>
-                                    <!-- Add more countries as needed -->
+                                    {% for country_name, iso_code in countries %}
+                                    <option value="{{ country_name }}">{{ country_name }} ({{ iso_code }})</option>
+                                    {% endfor %}
                                 </select>
                                 <input type="hidden" id="iso_code" name="iso_code" value="">
                             </div>
