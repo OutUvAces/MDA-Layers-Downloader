@@ -194,14 +194,18 @@ def worker(
     print(f"WORKER THREAD STARTED for task with iso_code={iso_code}, country={country_name}")
     print(f"WORKER THREAD: settings summary - territorial:{settings.territorial}, eez:{settings.eez}, mpa:{settings.mpa}")
 
-    try:
-        country_path = Path(country_output_dir)
-        global_path = Path(global_output_dir)
-        cache_path = Path(cache_dir)
+    country_path = Path(country_output_dir)
+    global_path = Path(global_output_dir)
+    cache_path = Path(cache_dir)
 
     # Create output folders
-    country_path.mkdir(exist_ok=True)
-    global_path.mkdir(exist_ok=True)
+    try:
+        country_path.mkdir(exist_ok=True)
+        global_path.mkdir(exist_ok=True)
+    except Exception as e:
+        print(f"WORKER THREAD: Failed to create directories: {str(e)}")
+        report_progress(0, f"Directory creation failed: {str(e)}")
+        return False  # Early return on directory creation failure
 
     # Create _metadata subfolder in both output directories and hide it
     for out_dir_str in [country_output_dir, global_output_dir]:
@@ -528,22 +532,12 @@ async def worker_async(
     else:
         report_progress(0, "No new files generated.")
 
-        report_progress(0, f"\nCountry folder: {country_output_dir}")
-        report_progress(0, f"Global folder: {global_output_dir}")
+    report_progress(0, f"\nCountry folder: {country_output_dir}")
+    report_progress(0, f"Global folder: {global_output_dir}")
 
-        # Send remaining progress to reach 100%
-        remaining = 100.0 - last_reported_pct
-        if remaining > 0:
-            report_progress(remaining, "\nDone!")
-        else:
-            report_progress(0, "\nDone!")
-
-    except Exception as e:
-        print("WORKER THREAD CRASHED with exception:")
-        import traceback
-        traceback.print_exc()
-        try:
-            report_progress(0, f"WORKER CRASHED: {str(e)}")
-        except:
-            print("Could not send crash report via progress callback")
-        raise  # Re-raise so main thread sees it too
+    # Send remaining progress to reach 100%
+    remaining = 100.0 - last_reported_pct
+    if remaining > 0:
+        report_progress(remaining, "\nDone!")
+    else:
+        report_progress(0, "\nDone!")
