@@ -729,7 +729,7 @@ def refresh_dynamic_caches():
             return False
 
         # Create cache directory if it doesn't exist
-        cache_dir = Path(__file__).parent.parent / "cache" / "dynamic" / "oscar_currents"
+        cache_dir = Path(__file__).parent.parent / "cache" / "raw_source_data" / "dynamic" / "oscar_currents"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         print("OSCAR: Authenticating with NASA Earthdata...")

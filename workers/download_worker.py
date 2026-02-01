@@ -217,7 +217,15 @@ def worker(
         # Check for pre-generated KMLs first (for default styles)
         if task.type in ("territorial", "contiguous", "eez", "ecs"):
             # Country-specific layers
-            pregenerated_path = cache_path / "pregenerated" / "country" / iso_code / f"{task.type}.kml"
+            # Map task types to new KML naming conventions
+            kml_name_map = {
+                'eez': f"{iso_code}_EEZ.kml",
+                'territorial_waters': f"{iso_code}_TTW.kml",
+                'contiguous_zone': f"{iso_code}_Contig.kml",
+                'ecs': f"{iso_code}_ECS.kml"
+            }
+            kml_filename = kml_name_map.get(task.type, f"{task.type}.kml")
+            pregenerated_path = cache_path / "pregenerated_kml" / "country" / iso_code / kml_filename
             if pregenerated_path.exists():
                 print(f"WORKER THREAD: Using pre-generated {task.type} for {iso_code}")
                 import shutil
@@ -229,7 +237,7 @@ def worker(
 
         elif task.type == "mpa":
             # MPA layer
-            pregenerated_path = cache_path / "pregenerated" / "country" / iso_code / "mpa.kml"
+            pregenerated_path = cache_path / "pregenerated_kml" / "country" / iso_code / f"{iso_code}_MPA.kml"
             if pregenerated_path.exists():
                 print(f"WORKER THREAD: Using pre-generated MPA for {iso_code}")
                 import shutil
@@ -241,7 +249,7 @@ def worker(
 
         elif task.type == "cables":
             # Global cables
-            pregenerated_path = cache_path / "pregenerated" / "global" / "cables.kml"
+            pregenerated_path = cache_path / "pregenerated_kml" / "global" / "sub_cables.kml"
             if pregenerated_path.exists():
                 print(f"WORKER THREAD: Using pre-generated cables")
                 import shutil
@@ -253,7 +261,7 @@ def worker(
 
         elif task.type == "seastate":
             # OSCAR currents (use same cached NetCDF, handled by clip_to_eez flag)
-            oscar_cache = cache_path / "dynamic" / "oscar_currents"
+            oscar_cache = cache_path / "raw_source_data" / "dynamic" / "oscar_currents"
             oscar_files = list(oscar_cache.glob("*.nc"))
             if oscar_files:
                 oscar_file = max(oscar_files, key=lambda x: x.stat().st_mtime)
@@ -271,7 +279,9 @@ def worker(
 
         elif task.type == "navwarnings":
             # Global nav warnings
-            pregenerated_path = cache_path / "pregenerated" / "global" / "nav_warnings.kml"
+            # Use today's date for nav warnings filename
+            today = datetime.now().strftime("%d%m%Y")
+            pregenerated_path = cache_path / "pregenerated_kml" / "global" / f"NAVWARN_{today}.kml"
             if pregenerated_path.exists():
                 print(f"WORKER THREAD: Using pre-generated nav warnings")
                 import shutil
@@ -394,7 +404,7 @@ def worker(
                 if (task.settings_color == default_colors.get(task.type) and
                     task.settings_opacity == default_opacities.get(task.type)):
                     # Use pre-generated KML
-                    pregenerated_dir = Path(__file__).parent.parent / "cache" / "pregenerated" / "country" / iso_code
+                    pregenerated_dir = Path(__file__).parent.parent / "cache" / "pregenerated_kml" / "country" / iso_code
                     layer_name_map = {
                         'territorial': 'territorial_waters',
                         'contiguous': 'contiguous_zone',
@@ -442,7 +452,7 @@ def worker(
                 report_progress(0, f"✓ {task.name} served from pre-generated KML")
             else:
                 # Check WDPA cache
-                wdpa_cache_dir = Path(__file__).parent.parent / "cache" / "static"
+                wdpa_cache_dir = Path(__file__).parent.parent / "cache" / "raw_source_data" / "static"
                 wdpa_files = list(wdpa_cache_dir.glob("mpa_global.*"))
                 if wdpa_files:
                     # Use most recent WDPA file
@@ -460,7 +470,7 @@ def worker(
             pregenerated_path = None
             if task.settings_color == '#ffffff' and task.settings_opacity == '50':
                 # Default styling - check for pre-generated
-                pregenerated_dir = Path(__file__).parent.parent / "cache" / "pregenerated" / "global"
+                pregenerated_dir = Path(__file__).parent.parent / "cache" / "pregenerated_kml" / "global"
                 pregenerated_file = pregenerated_dir / "cables.kml"
                 if pregenerated_file.exists():
                     pregenerated_path = pregenerated_file
@@ -473,7 +483,7 @@ def worker(
                 report_progress(0, f"✓ {task.name} served from pre-generated KML")
             else:
                 # Check submarine cables cache
-                cables_cache_dir = Path(__file__).parent.parent / "cache" / "static"
+                cables_cache_dir = Path(__file__).parent.parent / "cache" / "raw_source_data" / "static"
                 cables_files = list(cables_cache_dir.glob("cables_global.*"))
                 if cables_files:
                     # Use most recent cables file
@@ -488,7 +498,7 @@ def worker(
                     report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
         elif task.type == "seastate":
             # Check OSCAR cache (same data used for both country and global currents)
-            oscar_cache_dir = Path(__file__).parent.parent / "cache" / "dynamic" / "oscar_currents"
+            oscar_cache_dir = Path(__file__).parent.parent / "cache" / "raw_source_data" / "dynamic" / "oscar_currents"
             recent_files = list(oscar_cache_dir.glob("*.nc"))
             if recent_files:
                 # Use most recent OSCAR file (simplified - would need actual processing)
@@ -505,7 +515,7 @@ def worker(
             pregenerated_path = None
             if task.settings_color == '#ff0000' and task.settings_opacity == '80':
                 # Default styling - check for pre-generated
-                pregenerated_dir = Path(__file__).parent.parent / "cache" / "pregenerated" / "global"
+                pregenerated_dir = Path(__file__).parent.parent / "cache" / "pregenerated_kml" / "global"
                 pregenerated_file = pregenerated_dir / "nav_warnings.kml"
                 if pregenerated_file.exists():
                     pregenerated_path = pregenerated_file
@@ -518,7 +528,7 @@ def worker(
                 report_progress(0, f"✓ {task.name} served from pre-generated KML")
             else:
                 # Check nav warnings cache
-                nav_cache_dir = Path(__file__).parent.parent / "cache" / "dynamic" / "nav_warnings"
+                nav_cache_dir = Path(__file__).parent.parent / "cache" / "raw_source_data" / "dynamic" / "nav_warnings"
                 recent_files = list(nav_cache_dir.glob("*.json"))
                 if recent_files:
                     # Use most recent nav file (simplified - would need actual processing)

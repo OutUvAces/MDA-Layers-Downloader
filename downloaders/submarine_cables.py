@@ -15,7 +15,7 @@ def refresh_static_caches():
 
     try:
         # Create cache directory if it doesn't exist
-        cache_dir = Path(__file__).parent.parent / "cache" / "static"
+        cache_dir = Path(__file__).parent.parent / "cache" / "raw_source_data" / "static"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Download submarine cable data from the official API

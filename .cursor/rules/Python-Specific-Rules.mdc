@@ -1,0 +1,10 @@
+---
+alwaysApply: true
+---
+
+- For Python files: Always ensure changes pass basic syntax check.
+- Suggest verification commands like:
+  python -m py_compile downloaders/*.py
+  or run the app/module to test.
+- When dealing with description/Desc += strings: Keep them pure—never add generated <b> tags unless explicitly requested.
+- Be thorough: If removing features (e.g., berth buffer notes), check both parser and generator files.

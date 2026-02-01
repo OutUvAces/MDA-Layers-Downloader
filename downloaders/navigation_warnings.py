@@ -44,7 +44,7 @@ def refresh_dynamic_caches():
 
     try:
         from core.config import NGA_MSI_NAVWARNINGS_URL
-        cache_dir = Path(__file__).parent.parent / "cache" / "dynamic" / "nav_warnings"
+        cache_dir = Path(__file__).parent.parent / "cache" / "raw_source_data" / "dynamic" / "nav_warnings"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Download latest navigation warnings using simplified approach

@@ -59,14 +59,17 @@ current_tasks = {}
 
 # Cache configuration
 CACHE_DIR = Path(__file__).parent.parent / "cache"
-STATIC_CACHE_DIR = CACHE_DIR / "static"
-DYNAMIC_CACHE_DIR = CACHE_DIR / "dynamic"
-PREGENERATED_DIR = CACHE_DIR / "pregenerated"
+RAW_SOURCE_DIR = CACHE_DIR / "raw_source_data"
+STATIC_CACHE_DIR = RAW_SOURCE_DIR / "static"
+DYNAMIC_CACHE_DIR = RAW_SOURCE_DIR / "dynamic"
+PREGENERATED_DIR = CACHE_DIR / "pregenerated_kml"
 CACHE_METADATA_FILE = CACHE_DIR / "cache_metadata.json"
 
 # Ensure cache directories exist
+RAW_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
 STATIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
 DYNAMIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+PREGENERATED_DIR.mkdir(parents=True, exist_ok=True)
 PREGENERATED_DIR.mkdir(parents=True, exist_ok=True)
 
 def load_countries():
@@ -269,21 +272,21 @@ def pregenerate_default_kmls():
 
                     if not country_data.empty:
                         # EEZ
-                        eez_kml = country_iso_dir / "eez.kml"
+                        eez_kml = country_iso_dir / f"{country_iso}_EEZ.kml"
                         country_data.to_file(eez_kml, driver='KML')
                         print(f"PREGENERATE: Generated {eez_kml}")
 
                         # Territorial waters (simplified - would need 12nm buffer logic)
                         # For demo, just copy EEZ
-                        territorial_kml = country_iso_dir / "territorial_waters.kml"
+                        territorial_kml = country_iso_dir / f"{country_iso}_TTW.kml"
                         country_data.to_file(territorial_kml, driver='KML')
                         print(f"PREGENERATE: Generated {territorial_kml}")
 
                         # Similar for contiguous and ECS
-                        contiguous_kml = country_iso_dir / "contiguous_zone.kml"
+                        contiguous_kml = country_iso_dir / f"{country_iso}_Contig.kml"
                         country_data.to_file(contiguous_kml, driver='KML')
 
-                        ecs_kml = country_iso_dir / "ecs.kml"
+                        ecs_kml = country_iso_dir / f"{country_iso}_ECS.kml"
                         country_data.to_file(ecs_kml, driver='KML')
 
         except Exception as e:
@@ -334,9 +337,12 @@ def pregenerate_default_kmls():
                     print("PREGENERATE: No shapefiles found in extracted ZIP")
 
             # Generate country-specific MPA KMLs
-            if mpa_gdf is not None and 'iso3' in mpa_gdf.columns:
-                mpa_countries = mpa_gdf['iso3'].unique()
-                print(f"PREGENERATE: Found {len(mpa_countries)} countries with MPA data")
+            if mpa_gdf is not None and any(col.lower() == 'iso3' for col in mpa_gdf.columns):
+                # Find the correct column name (case-insensitive)
+                iso3_col = next(col for col in mpa_gdf.columns if col.lower() == 'iso3')
+
+                mpa_countries = mpa_gdf[iso3_col].unique()
+                print(f"PREGENERATE: Found {len(mpa_countries)} countries with MPA data (using column '{iso3_col}')")
                 for country_iso in mpa_countries[:10]:  # Limit for demo
                     if pd.isna(country_iso) or not country_iso:
                         continue
@@ -344,10 +350,10 @@ def pregenerate_default_kmls():
                     country_iso_dir = country_dir / str(country_iso)
                     country_iso_dir.mkdir(exist_ok=True)
 
-                    country_mpa = mpa_gdf[mpa_gdf['iso3'] == country_iso]
+                    country_mpa = mpa_gdf[mpa_gdf[iso3_col] == country_iso]
                     print(f"PREGENERATE: Country {country_iso}: {len(country_mpa)} MPA features")
                     if not country_mpa.empty:
-                        mpa_kml = country_iso_dir / "mpa.kml"
+                        mpa_kml = country_iso_dir / f"{country_iso}_MPA.kml"
                         try:
                             country_mpa.to_file(mpa_kml, driver='KML')
                             print(f"PREGENERATE: Generated {mpa_kml}")
@@ -373,7 +379,16 @@ def pregenerate_default_kmls():
             # Fix potential duplicate IDs by adding unique IDs and ensuring no duplicates
             seen_ids = set()
             for i, feature in enumerate(cables_data.get('features', [])):
-                original_id = feature.get('id', f"cable_{i}")
+                # Get original ID, handling various possible formats
+                original_id = feature.get('id')
+                if original_id is None or original_id == '':
+                    # Try to get name or other identifier
+                    properties = feature.get('properties', {})
+                    original_id = properties.get('name') or properties.get('Name') or properties.get('NAME') or f"cable_{i}"
+
+                # Clean the ID to make it safe
+                original_id = str(original_id).replace(' ', '_').replace('-', '_').replace('/', '_')
+
                 # Ensure unique ID
                 unique_id = original_id
                 counter = 1
@@ -392,7 +407,7 @@ def pregenerate_default_kmls():
             print(f"PREGENERATE: Loaded {len(cables_gdf)} cable features with unique IDs")
 
             if not cables_gdf.empty:
-                cables_kml = global_dir / "cables.kml"
+                cables_kml = global_dir / "sub_cables.kml"
                 try:
                     cables_gdf.to_file(cables_kml, driver='KML')
                     print(f"PREGENERATE: Generated {cables_kml}")
@@ -424,7 +439,9 @@ def pregenerate_default_kmls():
         print(f"PREGENERATE: Processing nav warnings from {nav_file}")
         try:
             # For now, create a simple placeholder KML
-            nav_kml = global_dir / "nav_warnings.kml"
+            # Use today's date for the filename
+            today = datetime.now().strftime("%d%m%Y")
+            nav_kml = global_dir / f"NAVWARN_{today}.kml"
             # In real implementation, would parse the nav data and create proper KML
             with open(nav_kml, 'w', encoding='utf-8') as f:
                 f.write("""<?xml version="1.0" encoding="UTF-8"?>
@@ -453,6 +470,7 @@ def refresh_caches():
     password = os.getenv('NASA_PASSWORD')
 
     # Refresh static caches (30 days)
+    static_refreshed = False
     static_age_days = get_cache_age(metadata.get('last_refresh_static'), 'days')
     if static_age_days > 30 or metadata.get('last_refresh_static') is None:
         print("CACHE REFRESH: Refreshing static caches...")
@@ -482,6 +500,7 @@ def refresh_caches():
                 print(f"CACHE REFRESH: Cables static refresh failed: {e}")
 
             metadata['last_refresh_static'] = datetime.now()
+            static_refreshed = True
             print("CACHE REFRESH: Static caches refreshed successfully")
         except Exception as e:
             print(f"CACHE REFRESH: Error refreshing static caches: {e}")
@@ -515,8 +534,8 @@ def refresh_caches():
     else:
         print(f"CACHE REFRESH: Dynamic caches are fresh ({dynamic_age_hours:.1f} hours old)")
 
-    # Pre-generate default-style KMLs for static layers
-    if static_age_days > 30 or metadata.get('last_refresh_static') is None:
+    # Pre-generate default-style KMLs for static layers (always after startup or static refresh)
+    if static_refreshed or 'last_refresh_static' not in metadata:
         print("CACHE REFRESH: Pre-generating default KMLs...")
         try:
             pregenerate_default_kmls()

@@ -1,0 +1,21 @@
+---
+alwaysApply: true
+---
+
+When removing, modifying, or refactoring code (especially blocks with indentation):
+
+- Always analyze the ENTIRE relevant file(s) first. Use @file references to confirm context.
+- Never use partial or risky regex replaces (e.g., PowerShell -replace) for multi-line blocks unless the pattern is guaranteed to match the full block exactly. Prefer precise alternatives.
+- Preferred methods for changes:
+  1. Provide exact line numbers to delete (e.g., "Delete lines 1660-1685 in navigation_warnings.py").
+  2. Show a full diff/patch (unified format).
+  3. Use Cursor's direct "Apply" if possible.
+- After any proposed change:
+  - Explicitly describe how to verify it (e.g., "Run python -m py_compile on the files" or "Check for IndentationError").
+  - Never claim "fixed" or "clean" without including a verification step.
+  - If verification fails in your reasoning, propose another fix.
+- Before declaring a task complete (e.g., "no more suffixes"):
+  - Search the entire codebase for similar patterns (e.g., grep-like: desc += "Berth", <b>, or suffix-related strings).
+  - Confirm with evidence (e.g., "No matches found in X files").
+- Always preserve perfect indentation and syntax. Python is strict—simulate the result mentally.
+- If previous fixes left dangling code, clean it all in one go.

@@ -1,0 +1,16 @@
+---
+alwaysApply: true
+---
+
+Before ANY response claiming a fix or completion:
+- Search the entire codebase for the pattern/issue (e.g., grep for "desc +=", "Berth", full_text fallback).
+- Provide evidence: "No matches found" or list them.
+- Propose changes with EXACT line numbers or full unified diffs ONLY—no regex/PowerShell unless 100% safe.
+- End with verification commands: e.g., python -m py_compile downloaders/*.py AND a test run description.
+- NEVER say "fixed/clean/done" without showing verification passed.
+- If previous fix failed, explain why and clean all remnants.
+
+For description/feature extraction:
+- Ensure per-feature desc = prefix + exact matched feature line + suffix ONLY.
+- No fallback to full_text.strip() unless index absolutely None.
+- Test mentally: For multi-point warnings, each point gets its own line (e.g., "A. ...") not others.

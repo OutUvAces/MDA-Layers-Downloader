@@ -485,7 +485,7 @@ def refresh_static_caches():
 
     try:
         from core.config import WDPA_BASE_URL
-        cache_dir = Path(__file__).parent.parent / "cache" / "static" / "wdpa"
+        cache_dir = Path(__file__).parent.parent / "cache" / "raw_source_data" / "static" / "wdpa"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Try to download the most recent WDPA data

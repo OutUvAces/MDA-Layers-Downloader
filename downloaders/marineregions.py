@@ -144,7 +144,7 @@ def refresh_static_caches():
     print("MARINEREGIONS: Refreshing static caches...")
 
     try:
-        cache_dir = Path(__file__).parent.parent / "cache" / "static" / "marineregions"
+        cache_dir = Path(__file__).parent.parent / "cache" / "raw_source_data" / "static" / "marineregions"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
         # Download EEZ data using WFS shapefile format
