@@ -419,7 +419,11 @@ def start_download():
         # Start the download task in a background thread
         print("MAIN THREAD: Starting download task")
         print(f"  task_id = {task_id}")
-        print(f"  settings = {layer_settings}, layers = {layer_settings.layers if layer_settings else None}, layers type = {type(layer_settings.layers) if layer_settings and hasattr(layer_settings, 'layers') and layer_settings.layers else 'None'}")
+        print(f"  layer_settings type = {type(layer_settings)}")
+        if hasattr(layer_settings, 'layers'):
+            print(f"  layer_settings.layers type = {type(layer_settings.layers)}, len = {len(layer_settings.layers) if layer_settings.layers else 'None'}")
+        else:
+            print("  layer_settings has no 'layers' attribute")
         print(f"  country_path = {country_dir}, type = {type(country_dir)}")
         print(f"  global_path = {global_dir}, type = {type(global_dir)}")
         print(f"  cache_path = {cache_dir}, type = {type(cache_dir)}")

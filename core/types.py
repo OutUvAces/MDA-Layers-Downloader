@@ -24,7 +24,7 @@ class LayerSettings:
         print("LayerSettings __post_init__: Checking fields...")
 
         # Check all fields that might be used with len()
-        fields_to_check = ['layers', 'territorial_color', 'eez_color', 'contiguous_color', 'mpa_color',
+        fields_to_check = ['territorial_color', 'eez_color', 'contiguous_color', 'mpa_color',
                           'ecs_color', 'cables_color', 'seastate_color', 'navwarnings_color',
                           'territorial_opacity', 'eez_opacity', 'contiguous_opacity', 'mpa_opacity',
                           'ecs_opacity', 'cables_opacity', 'seastate_opacity', 'navwarnings_opacity']
@@ -36,10 +36,7 @@ class LayerSettings:
                 if value is None:
                     print(f"LayerSettings WARNING: {field_name} field is None")
                     # Fix None values that might cause len() errors
-                    if field_name == 'layers':
-                        print("LayerSettings: Fixing layers = None to []")
-                        self.layers = []
-                    elif 'color' in field_name:
+                    if 'color' in field_name:
                         print(f"LayerSettings: Fixing {field_name} = None to '#ffffff'")
                         setattr(self, field_name, '#ffffff')
                     elif 'opacity' in field_name:
@@ -51,10 +48,6 @@ class LayerSettings:
                         print(f"LayerSettings {field_name} len = {length}")
                     except TypeError as e:
                         print(f"LayerSettings ERROR: len() failed on {field_name}: {e}")
-                        # Fix the problematic field
-                        if field_name == 'layers':
-                            print("LayerSettings: Fixing layers with len() error to []")
-                            self.layers = []
             else:
                 print(f"LayerSettings field {field_name} does not exist")
 
