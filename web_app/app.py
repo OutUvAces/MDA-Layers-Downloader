@@ -185,6 +185,7 @@ def allowed_file(filename):
 
 def run_download_task(task_id, settings, country_path, global_path, cache_path, iso_code, country_name, username, password, progress_queue):
     """Run the download task in a separate thread"""
+    print(f"RUN DOWNLOAD TASK STARTED for task_id={task_id}")
     try:
         def progress_callback(delta: float, message: str = ""):
             print(f"PROGRESS UPDATE SENT: delta={delta}, message='{message}'")
@@ -296,6 +297,10 @@ def start_download():
         username = request.form.get('nasa_username') or None
         password = request.form.get('nasa_password') or None
 
+        print("MAIN THREAD: Form data extracted")
+        print(f"  country={country}, iso_code={iso_code}")
+        print(f"  layers selected: territorial={request.form.get('territorial')}, eez={request.form.get('eez')}")
+
         # Validate that we have both country and ISO code
         if not country:
             return jsonify({'error': 'Country is required'}), 400
@@ -306,7 +311,9 @@ def start_download():
         print(f"MAIN THREAD: Passing NASA creds - username='{username[:3] if username else ''}...', password length={len(password)}")
 
         # Parse layer selections
-        layer_settings = LayerSettings(
+        print("MAIN THREAD: Creating LayerSettings...")
+        try:
+            layer_settings = LayerSettings(
             # Country-specific layers
             territorial=request.form.get('territorial') == 'on',
             contiguous=request.form.get('contiguous') == 'on',
@@ -350,6 +357,12 @@ def start_download():
             navwarnings_custom=False,
             cables_random=False
         )
+        print("MAIN THREAD: LayerSettings created successfully")
+        except Exception as e:
+            print("MAIN THREAD: LayerSettings creation failed:", str(e))
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
 
         # Create unique task ID
         task_id = f"task_{len(current_tasks)}"
@@ -387,14 +400,15 @@ def start_download():
         print(f"  iso_code = {iso_code}, country_name = {country}")
         print(f"  username = {username}, password_len = {len(password) if password else 'None'}")
 
+        print("MAIN THREAD: Creating thread with args...")
         download_thread = threading.Thread(
             target=run_download_task,
             args=(task_id, layer_settings, country_dir, global_dir, cache_dir, iso_code, country, username, password, progress_queue)
         )
+        print("MAIN THREAD: Thread object created")
         download_thread.daemon = True
         download_thread.start()
-
-        print(f"MAIN THREAD: Worker thread started, alive: {download_thread.is_alive()}")
+        print(f"MAIN THREAD: Thread started, alive: {download_thread.is_alive()}")
 
         current_tasks[task_id] = download_thread
 
