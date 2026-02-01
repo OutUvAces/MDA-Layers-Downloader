@@ -234,6 +234,8 @@ def worker(
         report_progress(0, f"Path creation failed: {str(e)}")
         return False
 
+    success = True  # Track overall success
+
     print("WORKER THREAD: Building tasks...")
     report_progress(0, "WORKER: Building tasks from cache...")
 
@@ -245,7 +247,8 @@ def worker(
     if not tasks:
         report_progress(0, "No layers selected.")
         report_progress(100)
-        return
+        print("WORKER THREAD: Final success = True (no tasks to process)")
+        return True
 
     total_weight = sum(t.weight for t in tasks)
     current_weight = [0.0]
@@ -295,7 +298,7 @@ def worker(
             continue
 
         report_progress(0, f"\nStarting: {task.name}...")
-        success = False
+        task_success = False
 
         # Check cache for layer data
         if task.type in ("territorial", "contiguous", "eez", "ecs"):
@@ -305,18 +308,18 @@ def worker(
                 # Copy from cache to output
                 import shutil
                 shutil.copy2(cache_file, task.output_path)
-                success = True
+                task_success = True
                 report_progress(0, f"✓ {task.name} loaded from cache")
             else:
-                success = False
+                task_success = False
                 report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
         elif task.type == "mpa":
             # WDPA cache not implemented yet
-            success = False
+            task_success = False
             report_progress(0, f"✗ {task.name} cache not implemented yet")
         elif task.type == "cables":
             # Cables cache not implemented yet
-            success = False
+            task_success = False
             report_progress(0, f"✗ {task.name} cache not implemented yet")
         elif task.type == "seastate":
             # Check OSCAR cache
@@ -326,10 +329,10 @@ def worker(
                 # Use most recent OSCAR file (simplified - would need actual processing)
                 cache_file = max(recent_files, key=lambda x: x.stat().st_mtime)
                 # In real implementation, would process the NetCDF and generate KML
-                success = True
+                task_success = True
                 report_progress(0, f"✓ {task.name} loaded from cache")
             else:
-                success = False
+                task_success = False
                 report_progress(0, f"✗ {task.name} cache not available - admin needs to refresh cache")
         elif task.type == "navwarnings":
             # Check nav warnings cache
@@ -338,11 +341,15 @@ def worker(
             if recent_files:
                 # Use most recent nav file (simplified - would need actual processing)
                 cache_file = max(recent_files, key=lambda x: x.stat().st_mtime)
-                success = True
+                task_success = True
                 report_progress(0, f"✓ {task.name} loaded from cache")
             else:
-                success = False
+                task_success = False
                 report_progress(0, f"✗ {task.name} cache not implemented yet")
+
+        # Update overall success
+        if not task_success:
+            success = False
 
         if success:
             if os.path.exists(task.output_path):
@@ -381,6 +388,9 @@ def worker(
             report_progress(remaining, "\nDone!")
         else:
             report_progress(0, "\nDone!")
+
+    print(f"WORKER THREAD: Final success = {success}")
+    return success
 
 async def worker_async(
     settings: LayerSettings,
