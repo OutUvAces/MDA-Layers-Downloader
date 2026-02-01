@@ -201,17 +201,21 @@ def worker(
 
     try:
         country_path = Path(country_output_dir)
-    global_path = Path(global_output_dir)
-    cache_path = Path(cache_dir)
+        global_path = Path(global_output_dir)
+        cache_path = Path(cache_dir)
 
-    # Create output folders
-    try:
-        country_path.mkdir(exist_ok=True)
-        global_path.mkdir(exist_ok=True)
+        # Create output folders
+        try:
+            country_path.mkdir(exist_ok=True)
+            global_path.mkdir(exist_ok=True)
+        except Exception as e:
+            print(f"WORKER THREAD: Failed to create directories: {str(e)}")
+            report_progress(0, f"Directory creation failed: {str(e)}")
+            return False  # Early return on directory creation failure
     except Exception as e:
-        print(f"WORKER THREAD: Failed to create directories: {str(e)}")
-        report_progress(0, f"Directory creation failed: {str(e)}")
-        return False  # Early return on directory creation failure
+        print(f"WORKER THREAD: Failed to create paths: {str(e)}")
+        report_progress(0, f"Path creation failed: {str(e)}")
+        return False
 
     # Create _metadata subfolder in both output directories and hide it
     for out_dir_str in [country_output_dir, global_output_dir]:
@@ -366,7 +370,7 @@ def worker(
     else:
         report_progress(0, "All selected layers already exist or have no data – no new files generated.")
 
-    report_progress(0, f"\nCountry folder: {country_output_dir}")
+        report_progress(0, f"\nCountry folder: {country_output_dir}")
         report_progress(0, f"Global folder: {global_output_dir}")
         # Send remaining progress to reach 100%
         remaining = 100.0 - last_reported_pct
@@ -374,17 +378,6 @@ def worker(
             report_progress(remaining, "\nDone!")
         else:
             report_progress(0, "\nDone!")
-
-    except TypeError as e:
-        print("WORKER TYPE ERROR:", str(e))
-        import traceback
-        traceback.print_exc()
-        report_progress(0, f"Processing error: {str(e)}")
-    except Exception as e:
-        print("WORKER GENERAL ERROR:", str(e))
-        import traceback
-        traceback.print_exc()
-        report_progress(0, f"Processing error: {str(e)}")
 
 async def worker_async(
     settings: LayerSettings,
