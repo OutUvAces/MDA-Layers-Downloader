@@ -56,12 +56,12 @@ def allowed_file(filename):
 def run_download_task(task_id, settings, country_path, global_path, cache_path, iso_code, country_name, progress_queue):
     """Run the download task in a separate thread"""
     try:
-    def progress_callback(delta: float, message: str = ""):
-        print(f"PROGRESS UPDATE SENT: delta={delta}, message='{message}'")
-        if message:
-            progress_queue.put({"type": "message", "content": message})
-        if delta > 0:
-            progress_queue.put({"type": "progress", "content": delta})
+        def progress_callback(delta: float, message: str = ""):
+            print(f"PROGRESS UPDATE SENT: delta={delta}, message='{message}'")
+            if message:
+                progress_queue.put({"type": "message", "content": message})
+            if delta > 0:
+                progress_queue.put({"type": "progress", "content": delta})
 
         # Run the processing
         success = worker(settings, username, password, str(country_path), str(global_path), cache_path, iso_code, country_name, progress_callback)
