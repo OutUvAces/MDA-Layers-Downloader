@@ -195,8 +195,17 @@ def pregenerate_default_kmls():
                 shp_files = list(Path(temp_dir).glob("*.shp"))
                 print(f"PREGENERATE: Found {len(shp_files)} shapefiles: {[str(f) for f in shp_files]}")
                 if shp_files:
-                    print(f"PREGENERATE: Reading shapefile {shp_files[0]}")
-                    mpa_gdf = gpd.read_file(shp_files[0])
+                    # Prefer polygons shapefile over points
+                    polygons_shp = None
+                    for shp_file in shp_files:
+                        if 'polygons' in str(shp_file).lower():
+                            polygons_shp = shp_file
+                            break
+                    if not polygons_shp:
+                        polygons_shp = shp_files[0]  # fallback to first one
+
+                    print(f"PREGENERATE: Reading shapefile {polygons_shp}")
+                    mpa_gdf = gpd.read_file(polygons_shp)
                     print(f"PREGENERATE: Loaded {len(mpa_gdf)} MPA features")
                 else:
                     print("PREGENERATE: No shapefiles found in extracted ZIP")
@@ -233,10 +242,23 @@ def pregenerate_default_kmls():
         cables_file = cables_files[0]
         print(f"PREGENERATE: Processing cables data from {cables_file}")
         try:
-            if cables_file.suffix == '.json':
-                cables_gdf = gpd.read_file(cables_file)
-            else:
-                cables_gdf = gpd.read_file(cables_file)
+            # Try to load and fix the GeoJSON if needed
+            import json
+            with open(cables_file, 'r', encoding='utf-8') as f:
+                cables_data = json.load(f)
+
+            # Fix potential duplicate IDs by adding unique IDs
+            for i, feature in enumerate(cables_data.get('features', [])):
+                if 'id' not in feature:
+                    feature['id'] = f"cable_{i}"
+
+            # Save fixed version
+            fixed_cables_file = cables_file.parent / "cables_global_fixed.geojson"
+            with open(fixed_cables_file, 'w', encoding='utf-8') as f:
+                json.dump(cables_data, f, indent=2)
+
+            cables_gdf = gpd.read_file(fixed_cables_file)
+            print(f"PREGENERATE: Loaded {len(cables_gdf)} cable features")
 
             if not cables_gdf.empty:
                 cables_kml = global_dir / "cables.kml"
