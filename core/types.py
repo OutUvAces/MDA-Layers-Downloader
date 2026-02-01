@@ -19,6 +19,13 @@ class LayerSettings:
     associated color and opacity settings.
     """
 
+    def __post_init__(self):
+        """Post-initialization hook for diagnostics"""
+        print("LayerSettings __post_init__: Checking fields...")
+        # Check if any field that might be used with len() is None
+        if hasattr(self, 'layers') and self.layers is None:
+            print("LayerSettings WARNING: layers field is None")
+
     # Layer enable/disable flags
     territorial: bool
     """Enable territorial waters layer."""

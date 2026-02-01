@@ -311,6 +311,11 @@ def start_download():
         print(f"MAIN THREAD: Passing NASA creds - username='{username[:3] if username else ''}...', password length={len(password)}")
 
         # Parse layer selections
+        print("MAIN THREAD: Preparing LayerSettings args")
+        print(f"  layers from form: territorial={request.form.get('territorial')}, eez={request.form.get('eez')}, mpa={request.form.get('mpa')}")
+        print(f"  colors: territorial_color={request.form.get('territorial_color')}, eez_color={request.form.get('eez_color')}")
+        print(f"  opacities: territorial_opacity={request.form.get('territorial_opacity')}, eez_opacity={request.form.get('eez_opacity')}")
+
         print("MAIN THREAD: Creating LayerSettings...")
         try:
             layer_settings = LayerSettings(
@@ -358,8 +363,18 @@ def start_download():
                 cables_random=False
             )
             print("MAIN THREAD: LayerSettings created successfully")
+            print(f"  layer_settings type = {type(layer_settings)}")
+            if hasattr(layer_settings, 'layers'):
+                print(f"  layer_settings.layers type = {type(layer_settings.layers)}, len = {len(layer_settings.layers) if layer_settings.layers else 'None'}")
+            else:
+                print("  layer_settings has no 'layers' attribute")
+        except TypeError as e:
+            print("MAIN THREAD: LayerSettings TypeError:", str(e))
+            import traceback
+            traceback.print_exc()
+            return jsonify({'error': str(e)}), 500
         except Exception as e:
-            print("MAIN THREAD: LayerSettings creation failed:", str(e))
+            print("MAIN THREAD: LayerSettings General Error:", str(e))
             import traceback
             traceback.print_exc()
             return jsonify({'error': str(e)}), 500
