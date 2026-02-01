@@ -7,28 +7,35 @@ def refresh_static_caches():
         cache_dir = Path(__file__).parent.parent / "cache" / "static"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Try to download submarine cable data from a public source
-        # Note: Finding a reliable public source for submarine cables is challenging
-        # This would typically require a commercial data provider or custom data source
-        cables_url = "https://example.com/submarine-cables.geojson"  # Placeholder URL
+        # Submarine cable data sources are typically commercial or restricted
+        # For this demo, we'll create a placeholder indicating where real data would come from
+        # In production, you might use:
+        # - TeleGeography submarine cable database (commercial)
+        # - FCC cable landing station data (limited scope)
+        # - Custom data provider
 
         cache_file = cache_dir / "cables_global.geojson"
 
-        print("CABLES: Downloading submarine cable data...")
-        try:
-            response = requests.get(cables_url, timeout=120)
-            response.raise_for_status()
+        print("CABLES: Submarine cable data requires commercial data source")
+        print("CABLES: Creating placeholder for demonstration")
 
-            with open(cache_file, 'w', encoding='utf-8') as f:
-                f.write(response.text)
+        # Create a minimal placeholder with a few example cable features
+        placeholder_data = {
+            "type": "FeatureCollection",
+            "features": [
+                {
+                    "type": "Feature",
+                    "properties": {"name": "Example Cable 1", "capacity": "Example"},
+                    "geometry": {"type": "LineString", "coordinates": [[-74.0, 40.7], [-0.1, 51.5]]}
+                }
+            ]
+        }
 
-            print(f"CABLES: Downloaded submarine cable data, size = {cache_file.stat().st_size} bytes")
-        except Exception as e:
-            print(f"CABLES: Failed to download submarine cable data: {e}")
-            # Create placeholder file
-            if not cache_file.exists():
-                cache_file.write_text('{"type": "FeatureCollection", "features": []}')
+        import json
+        with open(cache_file, 'w', encoding='utf-8') as f:
+            json.dump(placeholder_data, f, indent=2)
 
+        print(f"CABLES: Created placeholder cable data, size = {cache_file.stat().st_size} bytes")
         print("CABLES: Static cache refreshed successfully")
         return True
     except Exception as e:

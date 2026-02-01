@@ -56,14 +56,10 @@ def refresh_static_caches():
 
         print(f"MARINEREGIONS: Downloaded EEZ data, size = {eez_zip.stat().st_size} bytes")
 
-        # For other layers, we'd download similar data
-        # For now, create placeholder files for territorial, contiguous, ecs
-        layers = ["territorial_global", "contiguous_global", "ecs_global"]
-        for layer in layers:
-            cache_file = cache_dir / f"{layer}.gpkg"
-            if not cache_file.exists():
-                # Create placeholder for now
-                cache_file.touch()
+        # For other marine regions data, we could download additional datasets
+        # For now, we'll focus on EEZ as the primary static cache
+        # Territorial waters, contiguous zones, and ECS could be derived from EEZ data
+        # or downloaded from additional MarineRegions endpoints
 
         print("MARINEREGIONS: Static caches refreshed")
         return True

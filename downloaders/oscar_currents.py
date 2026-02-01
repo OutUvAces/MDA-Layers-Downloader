@@ -743,21 +743,46 @@ def refresh_dynamic_caches():
         # Find latest OSCAR data using CMR
         from core.config import OSCAR_CMR_URL, OSCAR_COLLECTION_ID
 
-        # Search for OSCAR data
-        search_url = f"{OSCAR_CMR_URL}/search/collections.json?concept_id={OSCAR_COLLECTION_ID}"
-        response = requests.get(search_url, timeout=30)
+        print("OSCAR: Searching for latest OSCAR data...")
+        search_url = f"{OSCAR_CMR_URL}/search/granules.json?collection_concept_id={OSCAR_COLLECTION_ID}&sort_key=-start_date&page_size=1"
+
+        headers = {"Authorization": f"Bearer {token}"}
+        response = requests.get(search_url, headers=headers, timeout=30)
         response.raise_for_status()
 
-        # For now, create a placeholder file since the full OSCAR download logic is complex
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
-        cache_file = cache_dir / f"oscar_currents_{timestamp}.nc"
-        if not cache_file.exists():
-            # Create placeholder file
-            cache_file.touch()
+        data = response.json()
+        if 'feed' in data and 'entry' in data['feed'] and data['feed']['entry']:
+            granule = data['feed']['entry'][0]
+            granule_url = None
 
-        print(f"OSCAR: Created cache file placeholder: {cache_file}")
-        print("OSCAR: Dynamic cache refreshed successfully")
-        return True
+            # Find the download URL for the NetCDF file
+            for link in granule.get('links', []):
+                if link.get('rel') == 'http://esipfed.org/ns/fedsearch/1.1/data#' and link.get('href', '').endswith('.nc'):
+                    granule_url = link['href']
+                    break
+
+            if granule_url:
+                print(f"OSCAR: Downloading OSCAR data from {granule_url}")
+                timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
+                cache_file = cache_dir / f"oscar_currents_{timestamp}.nc"
+
+                # Download the NetCDF file
+                response = requests.get(granule_url, headers=headers, stream=True, timeout=300)
+                response.raise_for_status()
+
+                with open(cache_file, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+
+                print(f"OSCAR: Downloaded OSCAR data, size = {cache_file.stat().st_size} bytes")
+                print("OSCAR: Dynamic cache refreshed successfully")
+                return True
+            else:
+                print("OSCAR: No suitable download URL found")
+                return False
+        else:
+            print("OSCAR: No OSCAR granules found")
+            return False
     except Exception as e:
         print(f"OSCAR: Dynamic cache refresh failed: {e}")
         return False
