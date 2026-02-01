@@ -1,3 +1,19 @@
+"""
+MarineRegions data downloader and processor.
+
+This module handles downloading geospatial data from MarineRegions.org,
+including territorial waters, EEZs, and other marine boundaries.
+"""
+
+import os
+import json
+import ctypes
+import aiohttp
+
+from processing.kml_style import process_kml
+from core.types import LayerTask
+from pathlib import Path
+
 def process(task: LayerTask, report_progress, output_dir: str, cache_dir: str) -> bool:
     """Synchronous version of process function"""
     # For now, just call the async version synchronously
@@ -42,7 +58,6 @@ async def process_async(session, task: LayerTask, report_progress, output_dir: s
     report_progress(0, f"Downloading {task.name} KML from MarineRegions...")
     try:
         # Force disable SSL verification for MarineRegions
-        import requests
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
@@ -141,7 +156,6 @@ def refresh_static_caches():
             # Force disable SSL verification for MarineRegions (as in original code)
             import urllib3
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-            import requests
 
             response = requests.get(eez_url, timeout=120, verify=False)
             response.raise_for_status()
