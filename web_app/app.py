@@ -233,6 +233,59 @@ def cache_status():
         'last_refresh_dynamic': metadata.get('last_refresh_dynamic')
     })
 
+@app.route('/get_iso_code')
+def get_iso_code():
+    """API endpoint to get ISO code for a country"""
+    country = request.args.get('country', '')
+
+    # Country to ISO code mapping
+    iso_map = {
+        'Japan': 'JPN',
+        'United States': 'USA',
+        'China': 'CHN',
+        'South Korea': 'KOR',
+        'Russia': 'RUS',
+        'Philippines': 'PHL',
+        'Vietnam': 'VNM',
+        'Malaysia': 'MYS',
+        'Indonesia': 'IDN',
+        'France': 'FRA',
+        'Germany': 'DEU',
+        'United Kingdom': 'GBR',
+        'Italy': 'ITA',
+        'Spain': 'ESP',
+        'Canada': 'CAN',
+        'Australia': 'AUS',
+        'Brazil': 'BRA',
+        'India': 'IND',
+        'Mexico': 'MEX',
+        'Netherlands': 'NLD',
+        'Belgium': 'BEL',
+        'Switzerland': 'CHE',
+        'Austria': 'AUT',
+        'Sweden': 'SWE',
+        'Norway': 'NOR',
+        'Denmark': 'DNK',
+        'Finland': 'FIN',
+        'Poland': 'POL',
+        'Czech Republic': 'CZE',
+        'Hungary': 'HUN',
+        'Portugal': 'PRT',
+        'Greece': 'GRC',
+        'Turkey': 'TUR',
+        'South Africa': 'ZAF',
+        'Egypt': 'EGY',
+        'Israel': 'ISR',
+        'Saudi Arabia': 'SAU',
+        'United Arab Emirates': 'ARE',
+        'Singapore': 'SGP',
+        'Thailand': 'THA',
+        'New Zealand': 'NZL'
+    }
+
+    iso_code = iso_map.get(country, '')
+    return jsonify({'iso_code': iso_code})
+
 @app.route('/start_download', methods=['POST'])
 def start_download():
     """Handle the download request"""
@@ -243,6 +296,13 @@ def start_download():
         username = request.form.get('nasa_username', '')
         password = request.form.get('nasa_password', '')
 
+        # Validate that we have both country and ISO code
+        if not country:
+            return jsonify({'error': 'Country is required'}), 400
+        if not iso_code:
+            return jsonify({'error': 'ISO code could not be determined for the selected country'}), 400
+
+        print(f"MAIN THREAD: Processing for {country} ({iso_code})")
         print(f"MAIN THREAD: Passing NASA creds - username='{username[:3] if username else ''}...', password length={len(password)}")
 
         # Parse layer selections

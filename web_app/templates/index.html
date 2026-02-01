@@ -43,7 +43,7 @@
                     <div class="mb-4">
                         <h5><i class="fas fa-map-marker-alt"></i> Country Selection</h5>
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-12">
                                 <label for="country" class="form-label">Country</label>
                                 <select class="form-select" id="country" name="country" required>
                                     <option value="">Select a country...</option>
@@ -58,10 +58,7 @@
                                     <option value="Indonesia">Indonesia</option>
                                     <!-- Add more countries as needed -->
                                 </select>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="iso_code" class="form-label">ISO Code</label>
-                                <input type="text" class="form-control" id="iso_code" name="iso_code" placeholder="e.g., JPN" required>
+                                <input type="hidden" id="iso_code" name="iso_code" value="">
                             </div>
                         </div>
                     </div>
@@ -169,24 +166,28 @@
 </div>
 
 <script>
-// Auto-fill ISO code based on country selection
+// Auto-fill ISO code based on country selection via AJAX
 document.getElementById('country').addEventListener('change', function() {
     const countrySelect = this;
     const isoInput = document.getElementById('iso_code');
-    const countryToIso = {
-        'Japan': 'JPN',
-        'United States': 'USA',
-        'China': 'CHN',
-        'South Korea': 'KOR',
-        'Russia': 'RUS',
-        'Philippines': 'PHL',
-        'Vietnam': 'VNM',
-        'Malaysia': 'MYS',
-        'Indonesia': 'IDN'
-    };
 
-    if (countrySelect.value && countryToIso[countrySelect.value]) {
-        isoInput.value = countryToIso[countrySelect.value];
+    if (countrySelect.value) {
+        // Make AJAX request to get ISO code
+        fetch(`/get_iso_code?country=${encodeURIComponent(countrySelect.value)}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.iso_code) {
+                    isoInput.value = data.iso_code;
+                } else {
+                    isoInput.value = '';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching ISO code:', error);
+                isoInput.value = '';
+            });
+    } else {
+        isoInput.value = '';
     }
 });
 </script>
