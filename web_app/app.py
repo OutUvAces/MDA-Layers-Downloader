@@ -122,11 +122,11 @@ def pregenerate_default_kmls():
 
     # Process EEZ data for country-specific layers
     marineregions_dir = STATIC_CACHE_DIR / "marineregions"
-    eez_gpkg = marineregions_dir / "World_EEZ_v12_20231025.gpkg"
-    if eez_gpkg.exists():
-        print(f"PREGENERATE: Loading EEZ data from {eez_gpkg}")
+    eez_file = marineregions_dir / "eez_global.geojson"
+    if eez_file.exists():
+        print(f"PREGENERATE: Loading EEZ data from {eez_file}")
         try:
-            gdf = gpd.read_file(eez_gpkg)
+            gdf = gpd.read_file(eez_file)
 
             # Get unique countries from EEZ data
             if 'iso_ter1' in gdf.columns:
@@ -174,15 +174,22 @@ def pregenerate_default_kmls():
         mpa_gdf = None
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
+                print(f"PREGENERATE: Extracting WDPA ZIP to {temp_dir}")
                 with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
                     zip_ref.extractall(temp_dir)
                 shp_files = list(Path(temp_dir).glob("*.shp"))
+                print(f"PREGENERATE: Found {len(shp_files)} shapefiles: {[str(f) for f in shp_files]}")
                 if shp_files:
+                    print(f"PREGENERATE: Reading shapefile {shp_files[0]}")
                     mpa_gdf = gpd.read_file(shp_files[0])
+                    print(f"PREGENERATE: Loaded {len(mpa_gdf)} MPA features")
+                else:
+                    print("PREGENERATE: No shapefiles found in extracted ZIP")
 
             # Generate country-specific MPA KMLs
             if mpa_gdf is not None and 'iso3' in mpa_gdf.columns:
                 mpa_countries = mpa_gdf['iso3'].unique()
+                print(f"PREGENERATE: Found {len(mpa_countries)} countries with MPA data")
                 for country_iso in mpa_countries[:10]:  # Limit for demo
                     if pd.isna(country_iso) or not country_iso:
                         continue
@@ -191,10 +198,16 @@ def pregenerate_default_kmls():
                     country_iso_dir.mkdir(exist_ok=True)
 
                     country_mpa = mpa_gdf[mpa_gdf['iso3'] == country_iso]
+                    print(f"PREGENERATE: Country {country_iso}: {len(country_mpa)} MPA features")
                     if not country_mpa.empty:
                         mpa_kml = country_iso_dir / "mpa.kml"
-                        country_mpa.to_file(mpa_kml, driver='KML')
-                        print(f"PREGENERATE: Generated {mpa_kml}")
+                        try:
+                            country_mpa.to_file(mpa_kml, driver='KML')
+                            print(f"PREGENERATE: Generated {mpa_kml}")
+                        except Exception as kml_error:
+                            print(f"PREGENERATE: Failed to generate {mpa_kml}: {kml_error}")
+            else:
+                print("PREGENERATE: MPA data not loaded or missing iso3 column")
 
         except Exception as e:
             print(f"PREGENERATE: Error processing MPA data: {e}")
