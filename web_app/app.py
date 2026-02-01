@@ -187,9 +187,14 @@ def index():
     """Main page with layer selection form"""
     # Get cache status for display
     metadata = load_cache_metadata()
+    static_age = get_cache_age(metadata.get('last_refresh_static'), 'days')
+    dynamic_age = get_cache_age(metadata.get('last_refresh_dynamic'), 'hours')
+
     cache_status = {
-        'static_age_days': get_cache_age(metadata.get('last_refresh_static'), 'days'),
-        'dynamic_age_hours': get_cache_age(metadata.get('last_refresh_dynamic'), 'hours'),
+        'static_age_days': static_age,
+        'dynamic_age_hours': dynamic_age,
+        'static_never_refreshed': static_age == float('inf') or static_age > 999,
+        'dynamic_never_refreshed': dynamic_age == float('inf') or dynamic_age > 999,
         'last_static': metadata.get('last_refresh_static'),
         'last_dynamic': metadata.get('last_refresh_dynamic')
     }

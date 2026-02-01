@@ -18,7 +18,7 @@
                     <h6><i class="fas fa-database"></i> Data Cache Status</h6>
                     <small>
                         Static layers (EEZ, territorial waters):
-                        {% if cache_status.static_age_days == float('inf') %}
+                        {% if cache_status.static_never_refreshed %}
                             <span class="text-danger">Never cached</span>
                         {% elif cache_status.static_age_days > 30 %}
                             <span class="text-warning">{{ "%.1f"|format(cache_status.static_age_days) }} days old (needs refresh)</span>
@@ -27,7 +27,7 @@
                         {% endif %}
                         <br>
                         Dynamic layers (ocean currents, nav warnings):
-                        {% if cache_status.dynamic_age_hours == float('inf') %}
+                        {% if cache_status.dynamic_never_refreshed %}
                             <span class="text-danger">Never cached</span>
                         {% elif cache_status.dynamic_age_hours > 12 %}
                             <span class="text-warning">{{ "%.1f"|format(cache_status.dynamic_age_hours) }} hours old (needs refresh)</span>
