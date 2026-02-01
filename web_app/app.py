@@ -171,6 +171,7 @@ def pregenerate_default_kmls():
     if wdpa_files:
         wdpa_file = wdpa_files[0]
         print(f"PREGENERATE: Processing MPA data from {wdpa_file}")
+        mpa_gdf = None
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
@@ -180,7 +181,7 @@ def pregenerate_default_kmls():
                     mpa_gdf = gpd.read_file(shp_files[0])
 
             # Generate country-specific MPA KMLs
-            if 'iso3' in mpa_gdf.columns:
+            if mpa_gdf is not None and 'iso3' in mpa_gdf.columns:
                 mpa_countries = mpa_gdf['iso3'].unique()
                 for country_iso in mpa_countries[:10]:  # Limit for demo
                     if pd.isna(country_iso) or not country_iso:
