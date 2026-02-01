@@ -216,20 +216,23 @@ def worker(
         return False
 
     try:
-
-    # Create _metadata subfolder in both output directories and hide it
-    for out_dir_str in [country_output_dir, global_output_dir]:
-        out_dir = Path(out_dir_str)
-        meta_dir = out_dir / "_metadata"
-        meta_dir.mkdir(exist_ok=True)
-        # Hide the folder on Windows
-        if os.name == 'nt':
-            try:
-                FILE_ATTRIBUTE_HIDDEN = 0x2
-                ctypes.windll.kernel32.SetFileAttributesW(str(meta_dir), FILE_ATTRIBUTE_HIDDEN)
-            except Exception as e:
-                report_progress(0, f"Warning: Could not hide _metadata folder in {out_dir}: {e}. "
-                                 "You can hide it manually: right-click folder → Properties → Hidden → Apply.")
+        # Create _metadata subfolder in both output directories and hide it
+        for out_dir_str in [country_output_dir, global_output_dir]:
+            out_dir = Path(out_dir_str)
+            meta_dir = out_dir / "_metadata"
+            meta_dir.mkdir(exist_ok=True)
+            # Hide the folder on Windows
+            if os.name == 'nt':
+                try:
+                    FILE_ATTRIBUTE_HIDDEN = 0x2
+                    ctypes.windll.kernel32.SetFileAttributesW(str(meta_dir), FILE_ATTRIBUTE_HIDDEN)
+                except Exception as e:
+                    report_progress(0, f"Warning: Could not hide _metadata folder in {out_dir}: {e}. "
+                                     "You can hide it manually: right-click folder → Properties → Hidden → Apply.")
+    except Exception as e:
+        print(f"WORKER: Failed to create paths/directories: {str(e)}")
+        report_progress(0, f"Path creation failed: {str(e)}")
+        return False
 
     print("WORKER THREAD: Building tasks...")
     report_progress(0, "WORKER: Building tasks from cache...")
@@ -378,17 +381,6 @@ def worker(
             report_progress(remaining, "\nDone!")
         else:
             report_progress(0, "\nDone!")
-
-    except TypeError as e:
-        print("WORKER TYPE ERROR:", str(e))
-        import traceback
-        traceback.print_exc()
-        report_progress(0, f"Processing error: {str(e)}")
-    except Exception as e:
-        print("WORKER GENERAL ERROR:", str(e))
-        import traceback
-        traceback.print_exc()
-        report_progress(0, f"Processing error: {str(e)}")
 
 async def worker_async(
     settings: LayerSettings,
