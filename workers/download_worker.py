@@ -191,9 +191,13 @@ def worker(
         country_name: Full country name
         report_progress: Progress reporting callback function
     """
-    country_path = Path(country_output_dir)
-    global_path = Path(global_output_dir)
-    cache_path = Path(cache_dir)
+    print(f"WORKER THREAD STARTED for task with iso_code={iso_code}, country={country_name}")
+    print(f"WORKER THREAD: settings summary - territorial:{settings.territorial}, eez:{settings.eez}, mpa:{settings.mpa}")
+
+    try:
+        country_path = Path(country_output_dir)
+        global_path = Path(global_output_dir)
+        cache_path = Path(cache_dir)
 
     # Create output folders
     country_path.mkdir(exist_ok=True)
@@ -213,8 +217,12 @@ def worker(
                 report_progress(0, f"Warning: Could not hide _metadata folder in {out_dir}: {e}. "
                                  "You can hide it manually: right-click folder → Properties → Hidden → Apply.")
 
+    print("WORKER THREAD: Building tasks...")
+    report_progress(0, "WORKER: Building download tasks...")
+
     tasks = build_tasks(settings, country_path, global_path, iso_code)
 
+    print(f"WORKER THREAD: Built {len(tasks)} tasks")
     report_progress(0, f"Created {len(tasks)} tasks to process.")
 
     if not tasks:
@@ -520,12 +528,22 @@ async def worker_async(
     else:
         report_progress(0, "No new files generated.")
 
-    report_progress(0, f"\nCountry folder: {country_output_dir}")
-    report_progress(0, f"Global folder: {global_output_dir}")
+        report_progress(0, f"\nCountry folder: {country_output_dir}")
+        report_progress(0, f"Global folder: {global_output_dir}")
 
-    # Send remaining progress to reach 100%
-    remaining = 100.0 - last_reported_pct
-    if remaining > 0:
-        report_progress(remaining, "\nDone!")
-    else:
-        report_progress(0, "\nDone!")
+        # Send remaining progress to reach 100%
+        remaining = 100.0 - last_reported_pct
+        if remaining > 0:
+            report_progress(remaining, "\nDone!")
+        else:
+            report_progress(0, "\nDone!")
+
+    except Exception as e:
+        print("WORKER THREAD CRASHED with exception:")
+        import traceback
+        traceback.print_exc()
+        try:
+            report_progress(0, f"WORKER CRASHED: {str(e)}")
+        except:
+            print("Could not send crash report via progress callback")
+        raise  # Re-raise so main thread sees it too

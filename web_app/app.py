@@ -56,11 +56,12 @@ def allowed_file(filename):
 def run_download_task(task_id, settings, country_path, global_path, cache_path, iso_code, country_name, progress_queue):
     """Run the download task in a separate thread"""
     try:
-        def progress_callback(delta: float, message: str = ""):
-            if message:
-                progress_queue.put({"type": "message", "content": message})
-            if delta > 0:
-                progress_queue.put({"type": "progress", "content": delta})
+    def progress_callback(delta: float, message: str = ""):
+        print(f"PROGRESS UPDATE SENT: delta={delta}, message='{message}'")
+        if message:
+            progress_queue.put({"type": "message", "content": message})
+        if delta > 0:
+            progress_queue.put({"type": "progress", "content": delta})
 
         # Run the processing
         success = worker(settings, username, password, str(country_path), str(global_path), cache_path, iso_code, country_name, progress_callback)
@@ -154,16 +155,21 @@ def start_download():
             'progress': 0,
             'status': 'running',
             'country_dir': str(country_dir) if country_dir else None,
-            'global_dir': str(global_dir)
+            'global_dir': str(global_dir),
+            'queue': progress_queue
         }
 
         # Start the download task in a background thread
+        print(f"MAIN THREAD: Launching worker for task {task_id} with iso_code={iso_code}")
+
         download_thread = threading.Thread(
             target=run_download_task,
             args=(task_id, layer_settings, country_dir, global_dir, cache_dir, iso_code, country, progress_queue)
         )
         download_thread.daemon = True
         download_thread.start()
+
+        print(f"MAIN THREAD: Worker thread started, alive: {download_thread.is_alive()}")
 
         current_tasks[task_id] = download_thread
 
@@ -185,13 +191,33 @@ def progress(task_id):
 @app.route('/progress_update/<task_id>')
 def progress_update(task_id):
     """API endpoint for progress updates"""
+    print(f"Progress poll requested for task {task_id} — current data: messages={len(progress_data.get(task_id, {}).get('messages', []))}, progress={progress_data.get(task_id, {}).get('progress', 0)}")
+
     if task_id not in progress_data:
         return jsonify({'error': 'Task not found'}), 404
 
     task_data = progress_data[task_id]
+    progress_queue = task_data['queue']
 
-    # Check for new messages in queue (this would need to be implemented)
-    # For now, return current status
+    # Process new messages from the queue
+    try:
+        while True:
+            update = progress_queue.get_nowait()
+            print(f"PROCESSING QUEUE UPDATE: {update}")
+
+            if update['type'] == 'message':
+                task_data['messages'].append(update['content'])
+            elif update['type'] == 'progress':
+                task_data['progress'] = min(100, task_data['progress'] + update['content'])
+            elif update['type'] == 'complete':
+                task_data['status'] = 'completed'
+                task_data['messages'].append(update['content'])
+            elif update['type'] == 'error':
+                task_data['status'] = 'error'
+                task_data['messages'].append(update['content'])
+    except queue.Empty:
+        pass  # No more updates in queue
+
     return jsonify({
         'messages': task_data['messages'],
         'progress': task_data['progress'],
