@@ -314,50 +314,50 @@ def start_download():
         print("MAIN THREAD: Creating LayerSettings...")
         try:
             layer_settings = LayerSettings(
-            # Country-specific layers
-            territorial=request.form.get('territorial') == 'on',
-            contiguous=request.form.get('contiguous') == 'on',
-            mpa=request.form.get('mpa') == 'on',
-            eez=request.form.get('eez') == 'on',
-            ecs=request.form.get('ecs') == 'on',
+                # Country-specific layers
+                territorial=request.form.get('territorial') == 'on',
+                contiguous=request.form.get('contiguous') == 'on',
+                mpa=request.form.get('mpa') == 'on',
+                eez=request.form.get('eez') == 'on',
+                ecs=request.form.get('ecs') == 'on',
 
-            # Global layers
-            cables=request.form.get('cables') == 'on',
-            seastate_global=request.form.get('seastate_global') == 'on',
-            navwarnings=request.form.get('navwarnings') == 'on',
+                # Global layers
+                cables=request.form.get('cables') == 'on',
+                seastate_global=request.form.get('seastate_global') == 'on',
+                navwarnings=request.form.get('navwarnings') == 'on',
 
-            # Settings
-            territorial_color=request.form.get('territorial_color', '#ffff00'),
-            contiguous_color=request.form.get('contiguous_color', '#00ff00'),
-            mpa_color=request.form.get('mpa_color', '#ff0000'),
-            eez_color=request.form.get('eez_color', '#0000ff'),
-            ecs_color=request.form.get('ecs_color', '#8B4513'),
-            cables_color=request.form.get('cables_color', '#ffffff'),
-            seastate_color=request.form.get('seastate_color', '#000000'),
-            navwarnings_color=request.form.get('navwarnings_color', '#ff0000'),
+                # Settings
+                territorial_color=request.form.get('territorial_color', '#ffff00'),
+                contiguous_color=request.form.get('contiguous_color', '#00ff00'),
+                mpa_color=request.form.get('mpa_color', '#ff0000'),
+                eez_color=request.form.get('eez_color', '#0000ff'),
+                ecs_color=request.form.get('ecs_color', '#8B4513'),
+                cables_color=request.form.get('cables_color', '#ffffff'),
+                seastate_color=request.form.get('seastate_color', '#000000'),
+                navwarnings_color=request.form.get('navwarnings_color', '#ff0000'),
 
-            # Opacity values (as strings)
-            territorial_opacity=request.form.get('territorial_opacity', '20'),
-            contiguous_opacity=request.form.get('contiguous_opacity', '20'),
-            mpa_opacity=request.form.get('mpa_opacity', '20'),
-            eez_opacity=request.form.get('eez_opacity', '20'),
-            ecs_opacity=request.form.get('ecs_opacity', '20'),
-            cables_opacity=request.form.get('cables_opacity', '50'),
-            seastate_opacity=request.form.get('seastate_opacity', '20'),
-            navwarnings_opacity=request.form.get('navwarnings_opacity', '80'),
+                # Opacity values (as strings)
+                territorial_opacity=request.form.get('territorial_opacity', '20'),
+                contiguous_opacity=request.form.get('contiguous_opacity', '20'),
+                mpa_opacity=request.form.get('mpa_opacity', '20'),
+                eez_opacity=request.form.get('eez_opacity', '20'),
+                ecs_opacity=request.form.get('ecs_opacity', '20'),
+                cables_opacity=request.form.get('cables_opacity', '50'),
+                seastate_opacity=request.form.get('seastate_opacity', '20'),
+                navwarnings_opacity=request.form.get('navwarnings_opacity', '80'),
 
-            # Other settings
-            seastate_country=request.form.get('seastate_country') == 'on',
+                # Other settings
+                seastate_country=request.form.get('seastate_country') == 'on',
 
-            # Sea state density settings (defaults)
-            seastate_density_country=1.0,
-            seastate_density_global=0.5,
+                # Sea state density settings (defaults)
+                seastate_density_country=1.0,
+                seastate_density_global=0.5,
 
-            # Other flags
-            navwarnings_custom=False,
-            cables_random=False
-        )
-        print("MAIN THREAD: LayerSettings created successfully")
+                # Other flags
+                navwarnings_custom=False,
+                cables_random=False
+            )
+            print("MAIN THREAD: LayerSettings created successfully")
         except Exception as e:
             print("MAIN THREAD: LayerSettings creation failed:", str(e))
             import traceback
