@@ -484,19 +484,47 @@ def refresh_static_caches():
     print("WDPA: Refreshing static cache...")
 
     try:
-        # Create cache directory if it doesn't exist
+        from core.config import WDPA_BASE_URL
         cache_dir = Path(__file__).parent.parent / "cache" / "static"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # For now, create a placeholder cache file to indicate refresh succeeded
-        # In a real implementation, this would download and process WDPA data
-        cache_file = cache_dir / "mpa_global.gpkg"
-        if not cache_file.exists():
-            # Create empty placeholder file
-            cache_file.touch()
+        # Try to download the most recent WDPA data
+        today = date.today()
+        wdpa_zip = None
 
-        print("WDPA: Static cache refreshed successfully")
-        return True
+        print("WDPA: Finding latest WDPA release...")
+        for months_back in range(6):  # Check last 6 months
+            target_date = today - timedelta(days=months_back * 30)
+            month_str = target_date.strftime("%b")
+            year_str = str(target_date.year)
+            zip_url = WDPA_BASE_URL.format(month=month_str, year=year_str)
+            zip_filename = os.path.basename(zip_url)
+            zip_path = cache_dir / zip_filename
+
+            try:
+                # Check if URL exists
+                response = requests.head(zip_url, timeout=30)
+                if response.status_code == 200:
+                    print(f"WDPA: Downloading {zip_filename}...")
+                    response = requests.get(zip_url, timeout=300)
+                    response.raise_for_status()
+
+                    with open(zip_path, 'wb') as f:
+                        f.write(response.content)
+
+                    print(f"WDPA: Downloaded WDPA data, size = {zip_path.stat().st_size} bytes")
+                    wdpa_zip = zip_path
+                    break
+            except Exception as e:
+                print(f"WDPA: Failed to download {zip_filename}: {e}")
+                continue
+
+        if wdpa_zip:
+            print("WDPA: Static cache refreshed successfully")
+            return True
+        else:
+            print("WDPA: No WDPA data could be downloaded")
+            return False
     except Exception as e:
         print(f"WDPA: Static cache refresh failed: {e}")
         return False

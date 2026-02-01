@@ -39,19 +39,37 @@ def refresh_static_caches():
     """Refresh all static caches for MarineRegions data"""
     print("MARINEREGIONS: Refreshing static caches...")
 
-    # For now, just create placeholder cache files
-    # In a real implementation, this would download and process the data
-    cache_dir = Path(__file__).parent.parent / "cache" / "static"
+    try:
+        cache_dir = Path(__file__).parent.parent / "cache" / "static"
+        cache_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create placeholder files to indicate cache exists
-    layers = ["eez_global", "territorial_global", "contiguous_global", "ecs_global"]
-    for layer in layers:
-        cache_file = cache_dir / f"{layer}.gpkg"
-        if not cache_file.exists():
-            # Create empty file as placeholder
-            cache_file.touch()
+        # Download EEZ data
+        print("MARINEREGIONS: Downloading EEZ data...")
+        eez_url = "https://www.marineregions.org/download_file.php?name=World_EEZ_v12_20231025.zip"
+        eez_zip = cache_dir / "eez_global.zip"
 
-    print("MARINEREGIONS: Static caches refreshed")
+        response = requests.get(eez_url, timeout=120)
+        response.raise_for_status()
+
+        with open(eez_zip, 'wb') as f:
+            f.write(response.content)
+
+        print(f"MARINEREGIONS: Downloaded EEZ data, size = {eez_zip.stat().st_size} bytes")
+
+        # For other layers, we'd download similar data
+        # For now, create placeholder files for territorial, contiguous, ecs
+        layers = ["territorial_global", "contiguous_global", "ecs_global"]
+        for layer in layers:
+            cache_file = cache_dir / f"{layer}.gpkg"
+            if not cache_file.exists():
+                # Create placeholder for now
+                cache_file.touch()
+
+        print("MARINEREGIONS: Static caches refreshed")
+        return True
+    except Exception as e:
+        print(f"MARINEREGIONS: Static cache refresh failed: {e}")
+        return False
 
 async def process_async(session, task: LayerTask, report_progress, output_dir: str, cache_dir: str) -> bool:
     """Async version of process function for concurrent downloads"""

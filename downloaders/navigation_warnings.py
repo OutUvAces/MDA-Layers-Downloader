@@ -1950,21 +1950,23 @@ def refresh_dynamic_caches():
     print("NAV WARNINGS: Refreshing dynamic cache...")
 
     try:
-        # Create cache directory if it doesn't exist
+        from core.config import NGA_MSI_NAVWARNINGS_URL
         cache_dir = Path(__file__).parent.parent / "cache" / "dynamic" / "nav_warnings"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # For now, create a placeholder cache file to indicate refresh succeeded
-        # In a real implementation, this would download the latest navigation warnings
+        # Download latest navigation warnings
+        print("NAV WARNINGS: Downloading latest navigation warnings...")
+        response = requests.get(NGA_MSI_NAVWARNINGS_URL, timeout=60)
+        response.raise_for_status()
+
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
         cache_file = cache_dir / f"nav_warnings_{timestamp}.json"
-        if not cache_file.exists():
-            # Create placeholder JSON file
-            import json
-            placeholder_data = {"warnings": [], "timestamp": timestamp}
-            with open(cache_file, 'w') as f:
-                json.dump(placeholder_data, f)
 
+        # Save the raw data
+        with open(cache_file, 'w', encoding='utf-8') as f:
+            json.dump({"data": response.text, "timestamp": timestamp}, f, indent=2)
+
+        print(f"NAV WARNINGS: Downloaded navigation warnings, size = {cache_file.stat().st_size} bytes")
         print("NAV WARNINGS: Dynamic cache refreshed successfully")
         return True
     except Exception as e:
