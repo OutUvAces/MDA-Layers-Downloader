@@ -183,7 +183,7 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def run_download_task(task_id, settings, country_path, global_path, cache_path, iso_code, country_name, progress_queue):
+def run_download_task(task_id, settings, country_path, global_path, cache_path, iso_code, country_name, username, password, progress_queue):
     """Run the download task in a separate thread"""
     try:
         def progress_callback(delta: float, message: str = ""):
@@ -293,8 +293,8 @@ def start_download():
         # Extract form data
         country = request.form.get('country', '')
         iso_code = request.form.get('iso_code', '')
-        username = request.form.get('nasa_username', '')
-        password = request.form.get('nasa_password', '')
+        username = request.form.get('nasa_username') or None
+        password = request.form.get('nasa_password') or None
 
         # Validate that we have both country and ISO code
         if not country:
@@ -382,7 +382,7 @@ def start_download():
 
         download_thread = threading.Thread(
             target=run_download_task,
-            args=(task_id, layer_settings, country_dir, global_dir, cache_dir, iso_code, country, progress_queue)
+            args=(task_id, layer_settings, country_dir, global_dir, cache_dir, iso_code, country, username, password, progress_queue)
         )
         download_thread.daemon = True
         download_thread.start()
