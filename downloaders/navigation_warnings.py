@@ -1957,15 +1957,52 @@ def refresh_dynamic_caches():
 
         # Download latest navigation warnings
         print("NAV WARNINGS: Downloading latest navigation warnings...")
-        response = requests.get(NGA_MSI_NAVWARNINGS_URL, timeout=60)
-        response.raise_for_status()
+
+        # Try the NGA MSI API
+        nav_urls = [
+            NGA_MSI_NAVWARNINGS_URL,
+            "https://msi.nga.mil/api/publications/broadcast-warn",
+            "https://msi.nga.mil/api/publications/weekly"
+        ]
+
+        nav_data = None
+        for url in nav_urls:
+            try:
+                print(f"NAV WARNINGS: Trying {url}")
+                response = requests.get(url, timeout=60, headers={'User-Agent': 'Mozilla/5.0'})
+
+                if response.status_code == 200:
+                    try:
+                        nav_data = response.json()
+                        if nav_data:
+                            print(f"NAV WARNINGS: Successfully got data from {url}")
+                            break
+                    except json.JSONDecodeError:
+                        # Try to save as text if not JSON
+                        nav_data = {"text": response.text, "url": url}
+                        print(f"NAV WARNINGS: Got text data from {url}")
+                        break
+                else:
+                    print(f"NAV WARNINGS: HTTP {response.status_code} from {url}")
+                    continue
+            except Exception as e:
+                print(f"NAV WARNINGS: Error with {url}: {e}")
+                continue
+
+        if not nav_data:
+            print("NAV WARNINGS: Failed to download from any source")
+            return False
 
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M")
         cache_file = cache_dir / f"nav_warnings_{timestamp}.json"
 
-        # Save the raw data
+        # Save the data
         with open(cache_file, 'w', encoding='utf-8') as f:
-            json.dump({"data": response.text, "timestamp": timestamp}, f, indent=2)
+            json.dump({
+                "data": nav_data,
+                "timestamp": timestamp,
+                "source_url": url if 'url' in locals() else NGA_MSI_NAVWARNINGS_URL
+            }, f, indent=2)
 
         print(f"NAV WARNINGS: Downloaded navigation warnings, size = {cache_file.stat().st_size} bytes")
         print("NAV WARNINGS: Dynamic cache refreshed successfully")

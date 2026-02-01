@@ -18,11 +18,10 @@ def refresh_static_caches():
         cache_dir = Path(__file__).parent.parent / "cache" / "static"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Try to download submarine cable data from a public source
-        # Note: Comprehensive cable data is usually commercial, but some public sources exist
+        # Try to download submarine cable data from public sources
         cables_urls = [
             "https://raw.githubusercontent.com/telegeography/www.submarinecablemap.com/master/public/cable-geo.json",
-            "https://submarinecablemap.com/api/v3/cables/all.json",
+            "https://www.submarinecablemap.com/api/v3/cables/all.json",
             "https://api.submarinecablemap.com/v3/cables/all.json"
         ]
 
@@ -31,11 +30,19 @@ def refresh_static_caches():
         for url in cables_urls:
             try:
                 print(f"CABLES: Trying to download from {url}")
-                response = requests.get(url, timeout=60)
-                response.raise_for_status()
+                response = requests.get(url, timeout=60, headers={'User-Agent': 'Mozilla/5.0'})
+
+                if response.status_code != 200:
+                    print(f"CABLES: HTTP {response.status_code} from {url}")
+                    continue
 
                 # Validate that we got JSON data
-                data = response.json()
+                try:
+                    data = response.json()
+                except json.JSONDecodeError:
+                    print(f"CABLES: Invalid JSON response from {url}")
+                    continue
+
                 if isinstance(data, (list, dict)) and len(str(data)) > 1000:  # Reasonable size check
                     with open(cache_file, 'w', encoding='utf-8') as f:
                         json.dump(data, f, indent=2)
@@ -43,10 +50,13 @@ def refresh_static_caches():
                     print(f"CABLES: Downloaded submarine cable data, size = {cache_file.stat().st_size} bytes")
                     break
                 else:
-                    print(f"CABLES: Response too small or invalid format from {url}")
+                    print(f"CABLES: Response too small or invalid format from {url} (size: {len(str(data))})")
                     continue
+            except requests.RequestException as e:
+                print(f"CABLES: Network error downloading from {url}: {e}")
+                continue
             except Exception as e:
-                print(f"CABLES: Failed to download from {url}: {e}")
+                print(f"CABLES: Unexpected error downloading from {url}: {e}")
                 continue
         else:
             # If all sources fail, create a minimal placeholder
