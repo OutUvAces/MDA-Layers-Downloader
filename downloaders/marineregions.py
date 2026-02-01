@@ -155,6 +155,7 @@ def refresh_static_caches():
         if not eez_zip.exists():
             # Force disable SSL verification for MarineRegions (as in original code)
             import urllib3
+            import requests
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
             response = requests.get(eez_url, timeout=120, verify=False)

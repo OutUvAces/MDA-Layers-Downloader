@@ -206,7 +206,7 @@ def worker(
         return False
 
     # Build tasks based on settings
-    tasks = build_tasks(settings, country_path, global_path, iso_code, country_name)
+    tasks = build_tasks(settings, country_path, global_path, iso_code)
 
     print(f"WORKER THREAD: Processing {len(tasks)} tasks")
 
