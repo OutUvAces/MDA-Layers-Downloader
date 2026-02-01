@@ -1,3 +1,15 @@
+"""
+Navigation warnings data downloader and processor.
+
+This module handles downloading navigation warning data and converting it to KML format.
+"""
+
+import os
+import json
+import datetime
+from pathlib import Path
+from core.types import LayerTask
+
 def process(task: LayerTask, report_progress, output_dir: str, cache_dir: str) -> bool:
     """Synchronous version of navigation warnings processing"""
     # For now, create a simple placeholder KML
