@@ -308,7 +308,7 @@ def start_download():
             return jsonify({'error': 'ISO code could not be determined for the selected country'}), 400
 
         print(f"MAIN THREAD: Processing for {country} ({iso_code})")
-        print(f"MAIN THREAD: Passing NASA creds - username='{username[:3] if username else ''}...', password length={len(password)}")
+        print(f"MAIN THREAD: Passing NASA creds - username='{username[:3] if username else ''}...', password length={len(password) if password is not None else 'None'}")
 
         # Parse layer selections
         print("MAIN THREAD: Preparing LayerSettings args")
