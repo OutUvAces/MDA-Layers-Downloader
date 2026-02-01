@@ -17,6 +17,8 @@ import sys
 import asyncio
 import tempfile
 import shutil
+import hashlib
+import time
 from pathlib import Path
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
 from werkzeug.utils import secure_filename
@@ -461,90 +463,212 @@ def pregenerate_default_kmls():
         except Exception as e:
             print(f"PREGENERATE: Error processing nav warnings: {e}")
 
-def refresh_caches():
-    """Refresh all caches (static and dynamic)"""
-    print("CACHE REFRESH: Starting cache refresh...")
+def calculate_file_hash(file_path: Path) -> str:
+    """Calculate SHA-256 hash of a file."""
+    hash_sha256 = hashlib.sha256()
+    with open(file_path, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_sha256.update(chunk)
+    return hash_sha256.hexdigest()
+
+def calculate_directory_hash(dir_path: Path) -> dict:
+    """Calculate hashes for all files in a directory."""
+    hashes = {}
+    for file_path in dir_path.rglob("*"):
+        if file_path.is_file():
+            relative_path = file_path.relative_to(dir_path)
+            hashes[str(relative_path)] = calculate_file_hash(file_path)
+    return hashes
+
+def compare_directory_hashes(old_hashes: dict, new_hashes: dict) -> bool:
+    """Compare two directory hash dictionaries. Return True if identical."""
+    return old_hashes == new_hashes
+
+def backup_directory(source_dir: Path, backup_suffix: str) -> Path:
+    """Create a timestamped backup of a directory."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_dir = source_dir.parent / f"{source_dir.name}_backup_{timestamp}_{backup_suffix}"
+    if source_dir.exists():
+        shutil.copytree(source_dir, backup_dir)
+        print(f"PIPELINE: Backed up {source_dir} to {backup_dir}")
+    return backup_dir
+
+def safe_delete_backup(backup_dir: Path):
+    """Safely delete a backup directory."""
+    if backup_dir.exists():
+        shutil.rmtree(backup_dir)
+        print(f"PIPELINE: Deleted backup {backup_dir}")
+
+def retry_download(func, max_retries=3, backoff_factor=2):
+    """Retry a download function with exponential backoff."""
+    for attempt in range(max_retries):
+        try:
+            result = func()
+            return result, True  # Success
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = backoff_factor ** attempt
+                print(f"PIPELINE: Download attempt {attempt + 1} failed: {e}. Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+            else:
+                print(f"PIPELINE: Download failed after {max_retries} attempts: {e}")
+                return None, False  # Failure
+
+def log_pipeline_action(action: str, details: str = ""):
+    """Log pipeline actions with timestamps."""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"PIPELINE [{timestamp}]: {action} {details}")
+
+def refresh_static_data():
+    """Refresh STATIC data with change detection and safe deletion."""
+    log_pipeline_action("STATIC REFRESH", "Starting static data refresh")
 
     metadata = load_cache_metadata()
-    username = os.getenv('NASA_USERNAME')
-    password = os.getenv('NASA_PASSWORD')
 
-    # Refresh static caches (30 days)
-    static_refreshed = False
+    # Check if 30 days have passed
     static_age_days = get_cache_age(metadata.get('last_refresh_static'), 'days')
-    if static_age_days > 30 or metadata.get('last_refresh_static') is None:
-        print("CACHE REFRESH: Refreshing static caches...")
-        try:
-            # Import downloaders here to avoid circular imports
-            from downloaders.marineregions import refresh_static_caches
-            from downloaders.wdpa import refresh_static_caches as refresh_wdpa
-            from downloaders.submarine_cables import refresh_static_caches as refresh_cables
+    if static_age_days <= 30 and metadata.get('last_refresh_static') is not None:
+        log_pipeline_action("STATIC REFRESH", f"Skipped - only {static_age_days:.1f} days old")
+        return False
 
-            # Call refresh functions
+    # Get old hashes from metadata for change detection
+    static_dir = RAW_SOURCE_DIR / "static"
+    old_hashes = metadata.get('static_hashes', {})
+    log_pipeline_action("STATIC REFRESH", f"Retrieved hashes for {len(old_hashes)} previously cached files")
+
+    # Create backup before downloading
+    backup_dir = backup_directory(static_dir, "static_pre_download")
+
+    # Download new static data with retry logic
+    download_success = True
+    try:
+        # Import downloaders here to avoid circular imports
+        from downloaders.marineregions import refresh_static_caches
+        from downloaders.wdpa import refresh_static_caches as refresh_wdpa
+        from downloaders.submarine_cables import refresh_static_caches as refresh_cables
+
+        # Download with retry
+        def download_static():
+            refresh_static_caches()
+            refresh_wdpa()
+            refresh_cables()
+            return True
+
+        result, success = retry_download(download_static, max_retries=3)
+        if not success:
+            log_pipeline_action("STATIC REFRESH", "Download failed after retries - keeping backup")
+            download_success = False
+            return False
+
+        log_pipeline_action("STATIC REFRESH", "Download completed successfully")
+
+    except Exception as e:
+        log_pipeline_action("STATIC REFRESH", f"Download failed: {e}")
+        download_success = False
+        return False
+
+    if download_success:
+        # Calculate new hashes for change detection
+        new_hashes = calculate_directory_hash(static_dir)
+        content_changed = not compare_directory_hashes(old_hashes, new_hashes)
+
+        # Check if country KMLs exist
+        kml_dir = PREGENERATED_DIR / "country"
+        kmls_exist = kml_dir.exists() and any(kml_dir.rglob("*.kml"))
+
+        if content_changed or not kmls_exist:
+            log_pipeline_action("STATIC REFRESH", f"Content changed: {content_changed}, KMLs exist: {kmls_exist} - regenerating KMLs")
             try:
-                refresh_static_caches()
-                print("CACHE REFRESH: MarineRegions static refresh completed")
+                pregenerate_default_kmls()
+                log_pipeline_action("STATIC REFRESH", "KML regeneration completed")
             except Exception as e:
-                print(f"CACHE REFRESH: MarineRegions static refresh failed: {e}")
+                log_pipeline_action("STATIC REFRESH", f"KML regeneration failed: {e}")
+                # Keep backup since processing failed
+                return False
+        else:
+            log_pipeline_action("STATIC REFRESH", "Content unchanged and KMLs exist - skipping regeneration")
 
-            try:
-                refresh_wdpa()
-                print("CACHE REFRESH: WDPA static refresh completed")
-            except Exception as e:
-                print(f"CACHE REFRESH: WDPA static refresh failed: {e}")
+        # Store new hashes for next comparison and update metadata
+        metadata['static_hashes'] = new_hashes
+        metadata['last_refresh_static'] = datetime.now()
 
-            try:
-                refresh_cables()
-                print("CACHE REFRESH: Cables static refresh completed")
-            except Exception as e:
-                print(f"CACHE REFRESH: Cables static refresh failed: {e}")
+        # Success: delete backup
+        safe_delete_backup(backup_dir)
+        save_cache_metadata(metadata)
+        log_pipeline_action("STATIC REFRESH", "Completed successfully")
+        return True
 
-            metadata['last_refresh_static'] = datetime.now()
-            static_refreshed = True
-            print("CACHE REFRESH: Static caches refreshed successfully")
-        except Exception as e:
-            print(f"CACHE REFRESH: Error refreshing static caches: {e}")
-    else:
-        print(f"CACHE REFRESH: Static caches are fresh ({static_age_days:.1f} days old)")
+    return False
 
-    # Refresh dynamic caches (12 hours)
-    dynamic_age_hours = get_cache_age(metadata.get('last_refresh_dynamic'), 'hours')
-    if dynamic_age_hours > 12 or metadata.get('last_refresh_dynamic') is None:
-        print("CACHE REFRESH: Refreshing dynamic caches...")
-        try:
-            from downloaders.oscar_currents import refresh_dynamic_caches
-            from downloaders.navigation_warnings import refresh_dynamic_caches as refresh_nav
+def refresh_dynamic_data():
+    """Refresh DYNAMIC data unconditionally with immediate KML regeneration."""
+    log_pipeline_action("DYNAMIC REFRESH", "Starting unconditional dynamic data refresh")
 
-            try:
-                refresh_dynamic_caches()
-                print("CACHE REFRESH: OSCAR dynamic refresh completed")
-            except Exception as e:
-                print(f"CACHE REFRESH: OSCAR dynamic refresh failed: {e}")
+    metadata = load_cache_metadata()
 
-            try:
-                refresh_nav()
-                print("CACHE REFRESH: Nav warnings dynamic refresh completed")
-            except Exception as e:
-                print(f"CACHE REFRESH: Nav warnings dynamic refresh failed: {e}")
+    # Always refresh dynamic data (every 12 hours, unconditionally)
+    dynamic_dir = RAW_SOURCE_DIR / "dynamic"
 
-            metadata['last_refresh_dynamic'] = datetime.now()
-            print("CACHE REFRESH: Dynamic caches refreshed successfully")
-        except Exception as e:
-            print(f"CACHE REFRESH: Error refreshing dynamic caches: {e}")
-    else:
-        print(f"CACHE REFRESH: Dynamic caches are fresh ({dynamic_age_hours:.1f} hours old)")
+    # Create backup before downloading
+    backup_dir = backup_directory(dynamic_dir, "dynamic_pre_download")
 
-    # Pre-generate default-style KMLs for static layers (always after startup or static refresh)
-    if static_refreshed or 'last_refresh_static' not in metadata:
-        print("CACHE REFRESH: Pre-generating default KMLs...")
+    # Download new dynamic data with retry logic
+    download_success = True
+    try:
+        from downloaders.oscar_currents import refresh_dynamic_caches
+        from downloaders.navigation_warnings import refresh_dynamic_caches as refresh_nav
+
+        def download_dynamic():
+            refresh_dynamic_caches()
+            refresh_nav()
+            return True
+
+        result, success = retry_download(download_dynamic, max_retries=3)
+        if not success:
+            log_pipeline_action("DYNAMIC REFRESH", "Download failed after retries - keeping backup")
+            download_success = False
+            return False
+
+        log_pipeline_action("DYNAMIC REFRESH", "Download completed successfully")
+
+    except Exception as e:
+        log_pipeline_action("DYNAMIC REFRESH", f"Download failed: {e}")
+        download_success = False
+        return False
+
+    if download_success:
+        # Always regenerate KMLs for dynamic data
         try:
             pregenerate_default_kmls()
-            print("CACHE REFRESH: Default KMLs pre-generated successfully")
+            log_pipeline_action("DYNAMIC REFRESH", "KML regeneration completed")
         except Exception as e:
-            print(f"CACHE REFRESH: Error pre-generating KMLs: {e}")
+            log_pipeline_action("DYNAMIC REFRESH", f"KML regeneration failed: {e}")
+            # Keep backup since processing failed
+            return False
 
-    save_cache_metadata(metadata)
-    print("CACHE REFRESH: Cache refresh completed")
+        # Success: delete backup and update metadata
+        safe_delete_backup(backup_dir)
+        metadata['last_refresh_dynamic'] = datetime.now()
+        save_cache_metadata(metadata)
+        log_pipeline_action("DYNAMIC REFRESH", "Completed successfully")
+        return True
+
+    return False
+
+def refresh_caches():
+    """Main pipeline: Refresh static and dynamic data following exact rules."""
+    log_pipeline_action("PIPELINE", "Starting automated data pipeline refresh")
+
+    # Always check and refresh dynamic data (every 12 hours, unconditionally)
+    dynamic_success = refresh_dynamic_data()
+
+    # Check and refresh static data (every 30 days, with change detection)
+    static_success = refresh_static_data()
+
+    if dynamic_success or static_success:
+        log_pipeline_action("PIPELINE", "Pipeline refresh completed successfully")
+    else:
+        log_pipeline_action("PIPELINE", "Pipeline refresh completed with failures")
 
 # Initialize and start the scheduler
 scheduler = BackgroundScheduler()
