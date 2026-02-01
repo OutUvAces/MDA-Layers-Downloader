@@ -7,6 +7,7 @@ __pycache__/
 # Output/Cache
 output/
 _cache/
+cache/
 *.kml
 *.meta
 
