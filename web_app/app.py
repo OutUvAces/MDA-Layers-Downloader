@@ -102,6 +102,7 @@ def get_cache_age(last_refresh, unit='hours'):
 def pregenerate_default_kmls():
     """Pre-generate default-style KMLs for static layers"""
     import geopandas as gpd
+    import zipfile
     from shapely import wkt
 
     country_dir = PREGENERATED_DIR / "country"

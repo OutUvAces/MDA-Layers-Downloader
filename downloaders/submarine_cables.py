@@ -18,8 +18,8 @@ def refresh_static_caches():
         cache_dir = Path(__file__).parent.parent / "cache" / "static"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Download submarine cable data from the known working source
-        cables_url = "https://raw.githubusercontent.com/telegeography/www.submarinecablemap.com/master/public/cable-geo.json"
+        # Download submarine cable data from the official API
+        cables_url = "https://www.submarinecablemap.com/api/v3/cable/cable-geo.json"
         cache_file = cache_dir / "cables_global.geojson"
 
         print(f"CABLES: Downloading submarine cable data from {cables_url}")
