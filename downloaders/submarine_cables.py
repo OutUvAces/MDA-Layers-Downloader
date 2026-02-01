@@ -50,24 +50,6 @@ def refresh_static_caches():
             return False
 
         # If download succeeded, continue with success
-        print("CABLES: Static cache refreshed")
-            # If all sources fail, create a minimal placeholder
-            print("CABLES: All download sources failed, creating placeholder")
-            placeholder_data = {
-                "type": "FeatureCollection",
-                "features": [
-                    {
-                        "type": "Feature",
-                        "properties": {"name": "Example Cable 1", "capacity": "Example"},
-                        "geometry": {"type": "LineString", "coordinates": [[-74.0, 40.7], [-0.1, 51.5]]}
-                    }
-                ]
-            }
-
-            with open(cache_file, 'w', encoding='utf-8') as f:
-                json.dump(placeholder_data, f, indent=2)
-
-            print(f"CABLES: Created placeholder cable data, size = {cache_file.stat().st_size} bytes")
         print("CABLES: Static cache refreshed successfully")
         return True
     except Exception as e:
