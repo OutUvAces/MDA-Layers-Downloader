@@ -12,6 +12,32 @@
             <div class="card-body">
                 <p class="text-muted">Download marine geospatial data layers for visualization in tools like Google Earth. Select your country and choose the data layers you need.</p>
 
+                <!-- Cache Status -->
+                {% if cache_status %}
+                <div class="alert alert-info">
+                    <h6><i class="fas fa-database"></i> Data Cache Status</h6>
+                    <small>
+                        Static layers (EEZ, territorial waters):
+                        {% if cache_status.static_age_days == float('inf') %}
+                            <span class="text-danger">Never cached</span>
+                        {% elif cache_status.static_age_days > 30 %}
+                            <span class="text-warning">{{ "%.1f"|format(cache_status.static_age_days) }} days old (needs refresh)</span>
+                        {% else %}
+                            <span class="text-success">{{ "%.1f"|format(cache_status.static_age_days) }} days old</span>
+                        {% endif %}
+                        <br>
+                        Dynamic layers (ocean currents, nav warnings):
+                        {% if cache_status.dynamic_age_hours == float('inf') %}
+                            <span class="text-danger">Never cached</span>
+                        {% elif cache_status.dynamic_age_hours > 12 %}
+                            <span class="text-warning">{{ "%.1f"|format(cache_status.dynamic_age_hours) }} hours old (needs refresh)</span>
+                        {% else %}
+                            <span class="text-success">{{ "%.1f"|format(cache_status.dynamic_age_hours) }} hours old</span>
+                        {% endif %}
+                    </small>
+                </div>
+                {% endif %}
+
                 <form method="post" action="{{ url_for('start_download') }}">
                     <!-- Country Selection -->
                     <div class="mb-4">

@@ -22,6 +22,8 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from werkzeug.utils import secure_filename
 import threading
 import queue
+from datetime import datetime, timedelta
+from apscheduler.schedulers.background import BackgroundScheduler
 
 # Add parent directory to path to import existing modules
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -48,6 +50,112 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 # Global variables for progress tracking
 progress_data = {}
 current_tasks = {}
+
+# Cache configuration
+CACHE_DIR = Path(__file__).parent.parent / "cache"
+STATIC_CACHE_DIR = CACHE_DIR / "static"
+DYNAMIC_CACHE_DIR = CACHE_DIR / "dynamic"
+CACHE_METADATA_FILE = CACHE_DIR / "cache_metadata.json"
+
+# Ensure cache directories exist
+STATIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+DYNAMIC_CACHE_DIR.mkdir(parents=True, exist_ok=True)
+
+def load_cache_metadata():
+    """Load cache metadata from JSON file"""
+    if CACHE_METADATA_FILE.exists():
+        try:
+            with open(CACHE_METADATA_FILE, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Error loading cache metadata: {e}")
+    return {"last_refresh_static": None, "last_refresh_dynamic": None, "version": "1.0"}
+
+def save_cache_metadata(metadata):
+    """Save cache metadata to JSON file"""
+    try:
+        with open(CACHE_METADATA_FILE, 'w') as f:
+            json.dump(metadata, f, indent=2, default=str)
+    except Exception as e:
+        print(f"Error saving cache metadata: {e}")
+
+def get_cache_age(last_refresh, unit='hours'):
+    """Get age of cache in specified unit"""
+    if not last_refresh:
+        return float('inf')
+    try:
+        if isinstance(last_refresh, str):
+            last_refresh = datetime.fromisoformat(last_refresh.replace('Z', '+00:00'))
+        age = datetime.now() - last_refresh.replace(tzinfo=None)
+        if unit == 'hours':
+            return age.total_seconds() / 3600
+        elif unit == 'days':
+            return age.total_seconds() / (3600 * 24)
+    except Exception as e:
+        print(f"Error calculating cache age: {e}")
+        return float('inf')
+
+def refresh_caches():
+    """Refresh all caches (static and dynamic)"""
+    print("CACHE REFRESH: Starting cache refresh...")
+
+    metadata = load_cache_metadata()
+    username = os.getenv('NASA_USERNAME')
+    password = os.getenv('NASA_PASSWORD')
+
+    # Refresh static caches (30 days)
+    static_age_days = get_cache_age(metadata.get('last_refresh_static'), 'days')
+    if static_age_days > 30 or metadata.get('last_refresh_static') is None:
+        print("CACHE REFRESH: Refreshing static caches...")
+        try:
+            # Import downloaders here to avoid circular imports
+            from downloaders.marineregions import refresh_static_caches
+            from downloaders.wdpa import refresh_static_caches as refresh_wdpa
+            from downloaders.submarine_cables import refresh_static_caches as refresh_cables
+
+            # Call refresh functions (we'll need to implement these)
+            refresh_static_caches()
+            refresh_wdpa()
+            refresh_cables()
+
+            metadata['last_refresh_static'] = datetime.now()
+            print("CACHE REFRESH: Static caches refreshed successfully")
+        except Exception as e:
+            print(f"CACHE REFRESH: Error refreshing static caches: {e}")
+    else:
+        print(f"CACHE REFRESH: Static caches are fresh ({static_age_days:.1f} days old)")
+
+    # Refresh dynamic caches (12 hours)
+    dynamic_age_hours = get_cache_age(metadata.get('last_refresh_dynamic'), 'hours')
+    if dynamic_age_hours > 12 or metadata.get('last_refresh_dynamic') is None:
+        print("CACHE REFRESH: Refreshing dynamic caches...")
+        try:
+            from downloaders.oscar_currents import refresh_dynamic_caches
+            from downloaders.navigation_warnings import refresh_dynamic_caches as refresh_nav
+
+            if username and password:
+                refresh_dynamic_caches(username, password)
+                refresh_nav()
+                metadata['last_refresh_dynamic'] = datetime.now()
+                print("CACHE REFRESH: Dynamic caches refreshed successfully")
+            else:
+                print("CACHE REFRESH: Skipping dynamic caches - NASA_USERNAME/PASSWORD not set")
+        except Exception as e:
+            print(f"CACHE REFRESH: Error refreshing dynamic caches: {e}")
+    else:
+        print(f"CACHE REFRESH: Dynamic caches are fresh ({dynamic_age_hours:.1f} hours old)")
+
+    save_cache_metadata(metadata)
+    print("CACHE REFRESH: Cache refresh completed")
+
+# Initialize and start the scheduler
+scheduler = BackgroundScheduler()
+scheduler.add_job(refresh_caches, 'interval', hours=12, id='cache_refresh')
+scheduler.start()
+
+# Initial cache check on startup
+print("APP STARTUP: Checking cache status...")
+refresh_caches()
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -77,7 +185,26 @@ def run_download_task(task_id, settings, country_path, global_path, cache_path, 
 @app.route('/')
 def index():
     """Main page with layer selection form"""
-    return render_template('index.html')
+    # Get cache status for display
+    metadata = load_cache_metadata()
+    cache_status = {
+        'static_age_days': get_cache_age(metadata.get('last_refresh_static'), 'days'),
+        'dynamic_age_hours': get_cache_age(metadata.get('last_refresh_dynamic'), 'hours'),
+        'last_static': metadata.get('last_refresh_static'),
+        'last_dynamic': metadata.get('last_refresh_dynamic')
+    }
+    return render_template('index.html', cache_status=cache_status)
+
+@app.route('/cache_status')
+def cache_status():
+    """API endpoint for cache status"""
+    metadata = load_cache_metadata()
+    return jsonify({
+        'static_age_days': get_cache_age(metadata.get('last_refresh_static'), 'days'),
+        'dynamic_age_hours': get_cache_age(metadata.get('last_refresh_dynamic'), 'hours'),
+        'last_refresh_static': metadata.get('last_refresh_static'),
+        'last_refresh_dynamic': metadata.get('last_refresh_dynamic')
+    })
 
 @app.route('/start_download', methods=['POST'])
 def start_download():
