@@ -231,7 +231,7 @@ def get_cache_age(last_refresh, unit='hours'):
         print(f"Error calculating cache age: {e}")
         return float('inf')
 
-def pregenerate_default_kmls():
+def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
     """Pre-generate default-style KMLs for static layers"""
     import geopandas as gpd
     import zipfile
@@ -241,6 +241,20 @@ def pregenerate_default_kmls():
     global_dir = PREGENERATED_DIR / "global"
     country_dir.mkdir(parents=True, exist_ok=True)
     global_dir.mkdir(parents=True, exist_ok=True)
+
+    # Check if we can skip regeneration (for static data only)
+    if not force_regeneration and changed_layers is not None:
+        # Check if country KMLs exist
+        country_kmls_exist = country_dir.exists() and any(country_dir.rglob("*.kml"))
+        global_kmls_exist = global_dir.exists() and any(global_dir.rglob("*.kml"))
+
+        if country_kmls_exist and global_kmls_exist and not changed_layers:
+            print("PREGENERATE: All KMLs exist and no layers changed - skipping regeneration")
+            return
+
+        if not changed_layers:
+            print("PREGENERATE: No layers changed - skipping regeneration")
+            return
 
     # Default styling (from LayerSettings defaults)
     default_styles = {
@@ -507,6 +521,44 @@ def compare_directory_hashes(old_hashes: dict, new_hashes: dict) -> bool:
     """Compare two directory hash dictionaries. Return True if identical."""
     return old_hashes == new_hashes
 
+def calculate_layer_hashes(static_dir: Path) -> dict:
+    """Calculate hashes for each static layer subdirectory."""
+    layer_hashes = {}
+
+    # Define the static layers and their subdirectories
+    static_layers = {
+        'marineregions': static_dir / 'marineregions',
+        'wdpa': static_dir / 'wdpa',
+        'cables': static_dir / 'cables_global.geojson'  # This is a file, not dir
+    }
+
+    for layer_name, layer_path in static_layers.items():
+        if layer_path.exists():
+            if layer_path.is_file():
+                # For single files like cables_global.geojson
+                layer_hashes[layer_name] = calculate_file_hash(layer_path)
+            elif layer_path.is_dir():
+                # For directories like marineregions, wdpa
+                layer_hashes[layer_name] = calculate_directory_hash(layer_path)
+        else:
+            layer_hashes[layer_name] = None
+
+    return layer_hashes
+
+def has_layer_changed(old_layer_hashes: dict, new_layer_hashes: dict, layer_name: str) -> bool:
+    """Check if a specific layer has changed by comparing hashes."""
+    old_hash = old_layer_hashes.get(layer_name)
+    new_hash = new_layer_hashes.get(layer_name)
+
+    if old_hash is None and new_hash is None:
+        return False  # Both missing - no change
+    if old_hash is None or new_hash is None:
+        return True   # One missing, one present - changed
+    if isinstance(old_hash, dict) and isinstance(new_hash, dict):
+        return not compare_directory_hashes(old_hash, new_hash)  # Directory comparison
+    else:
+        return old_hash != new_hash  # File hash comparison
+
 def backup_directory(source_dir: Path, backup_suffix: str) -> Path:
     """Create a timestamped backup of a directory."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -582,34 +634,35 @@ def log_pipeline_action(action: str, details: str = ""):
     print(f"PIPELINE [{timestamp}]: {action} {details}")
 
 def refresh_static_data():
-    """Refresh STATIC data with change detection and safe deletion."""
+    """Refresh STATIC data with granular change detection and conditional KML regeneration."""
     log_pipeline_action("STATIC REFRESH", "Starting static data refresh")
 
     metadata = load_cache_metadata()
-
-    # Check if 30 days have passed
-    static_age_days = get_cache_age(metadata.get('last_refresh_static'), 'days')
-    if static_age_days <= 30 and metadata.get('last_refresh_static') is not None:
-        log_pipeline_action("STATIC REFRESH", f"Skipped - only {static_age_days:.1f} days old")
-        return False
-
-    # Get old hashes from metadata for change detection
     static_dir = RAW_SOURCE_DIR / "static"
-    old_hashes = metadata.get('static_hashes', {})
-    log_pipeline_action("STATIC REFRESH", f"Retrieved hashes for {len(old_hashes)} previously cached files")
 
-    # Create backup before downloading
+    # Check if refresh is needed (30 days OR manual flag)
+    static_age_days = get_cache_age(metadata.get('last_refresh_static'), 'days')
+    static_changed_flag = metadata.get('static_changed', False)
+
+    if static_age_days <= 30 and not static_changed_flag:
+        log_pipeline_action("STATIC REFRESH", f"Skipped - age {static_age_days:.1f} days, no change flag")
+        return True  # Not an error, just no refresh needed
+
+    log_pipeline_action("STATIC REFRESH", f"Refresh triggered - age {static_age_days:.1f} days, change flag: {static_changed_flag}")
+
+    # Get old layer hashes for comparison
+    old_layer_hashes = metadata.get('static_layers', {})
+
+    # Create backup before any changes
     backup_dir = backup_directory(static_dir, "static_pre_download")
 
     # Download new static data with retry logic
     download_success = True
     try:
-        # Import downloaders here to avoid circular imports
         from downloaders.marineregions import refresh_static_caches
         from downloaders.wdpa import refresh_static_caches as refresh_wdpa
         from downloaders.submarine_cables import refresh_static_caches as refresh_cables
 
-        # Download with retry
         def download_static():
             refresh_static_caches()
             refresh_wdpa()
@@ -630,31 +683,38 @@ def refresh_static_data():
         return False
 
     if download_success:
-        # Calculate new hashes for change detection
-        new_hashes = calculate_directory_hash(static_dir)
-        content_changed = not compare_directory_hashes(old_hashes, new_hashes)
+        # Calculate new layer hashes for change detection
+        new_layer_hashes = calculate_layer_hashes(static_dir)
+
+        # Check which layers changed
+        changed_layers = []
+        for layer_name in ['marineregions', 'wdpa', 'cables']:
+            if has_layer_changed(old_layer_hashes, new_layer_hashes, layer_name):
+                changed_layers.append(layer_name)
 
         # Check if country KMLs exist
         kml_dir = PREGENERATED_DIR / "country"
         kmls_exist = kml_dir.exists() and any(kml_dir.rglob("*.kml"))
 
-        if content_changed or not kmls_exist:
-            log_pipeline_action("STATIC REFRESH", f"Content changed: {content_changed}, KMLs exist: {kmls_exist} - regenerating KMLs")
+        needs_kml_regen = bool(changed_layers) or not kmls_exist
+
+        if needs_kml_regen:
+            log_pipeline_action("STATIC REFRESH", f"Changed layers: {changed_layers}, KMLs exist: {kmls_exist} - regenerating KMLs")
             try:
-                pregenerate_default_kmls()
+                pregenerate_default_kmls(force_regeneration=False, changed_layers=changed_layers)
                 log_pipeline_action("STATIC REFRESH", "KML regeneration completed")
             except Exception as e:
                 log_pipeline_action("STATIC REFRESH", f"KML regeneration failed: {e}")
-                # Keep backup since processing failed
                 return False
         else:
-            log_pipeline_action("STATIC REFRESH", "Content unchanged and KMLs exist - skipping regeneration")
+            log_pipeline_action("STATIC REFRESH", "No changes detected and KMLs exist - skipping regeneration")
 
-        # Store new hashes for next comparison and update metadata
-        metadata['static_hashes'] = new_hashes
+        # Update metadata with new hashes and timestamp
+        metadata['static_layers'] = new_layer_hashes
         metadata['last_refresh_static'] = datetime.now()
+        metadata['static_changed'] = False  # Reset flag
 
-        # Success: delete backup
+        # Success: delete backup and save metadata
         safe_delete_backup(backup_dir)
         save_cache_metadata(metadata)
         log_pipeline_action("STATIC REFRESH", "Completed successfully")
@@ -667,9 +727,11 @@ def refresh_dynamic_data():
     log_pipeline_action("DYNAMIC REFRESH", "Starting unconditional dynamic data refresh")
 
     metadata = load_cache_metadata()
-
-    # Always refresh dynamic data (every 12 hours, unconditionally)
     dynamic_dir = RAW_SOURCE_DIR / "dynamic"
+
+    # Check age - allow some tolerance for testing (unconditional refresh every run for now)
+    dynamic_age_hours = get_cache_age(metadata.get('last_refresh_dynamic'), 'hours')
+    log_pipeline_action("DYNAMIC REFRESH", f"Age: {dynamic_age_hours:.1f} hours - unconditional refresh")
 
     # Create backup before downloading
     backup_dir = backup_directory(dynamic_dir, "dynamic_pre_download")
@@ -699,13 +761,13 @@ def refresh_dynamic_data():
         return False
 
     if download_success:
-        # Always regenerate KMLs for dynamic data
+        # Always regenerate global KMLs for dynamic data (sub_cables and NAVWARN)
         try:
-            pregenerate_default_kmls()
+            # Force regeneration for dynamic data
+            pregenerate_default_kmls(force_regeneration=True, changed_layers=None)
             log_pipeline_action("DYNAMIC REFRESH", "KML regeneration completed")
         except Exception as e:
             log_pipeline_action("DYNAMIC REFRESH", f"KML regeneration failed: {e}")
-            # Keep backup since processing failed
             return False
 
         # Success: delete backup and update metadata
@@ -721,16 +783,28 @@ def refresh_caches():
     """Main pipeline: Refresh static and dynamic data following exact rules."""
     log_pipeline_action("PIPELINE", "Starting automated data pipeline refresh")
 
-    # Always check and refresh dynamic data (every 12 hours, unconditionally)
+    metadata = load_cache_metadata()
+
+    # Always refresh dynamic data (every 12 hours, unconditionally)
+    log_pipeline_action("PIPELINE", "Phase 1: Refreshing DYNAMIC data (unconditional)")
     dynamic_success = refresh_dynamic_data()
 
-    # Check and refresh static data (every 30 days, with change detection)
+    # Conditionally refresh static data (every 30 days OR change flag)
+    log_pipeline_action("PIPELINE", "Phase 2: Checking STATIC data refresh conditions")
     static_success = refresh_static_data()
 
-    if dynamic_success or static_success:
-        log_pipeline_action("PIPELINE", "Pipeline refresh completed successfully")
+    # Save final metadata state
+    save_cache_metadata(metadata)
+
+    # Summary logging
+    if dynamic_success and static_success:
+        log_pipeline_action("PIPELINE", "Pipeline refresh completed successfully - both phases succeeded")
+    elif dynamic_success:
+        log_pipeline_action("PIPELINE", "Pipeline refresh completed - dynamic succeeded, static skipped or failed")
+    elif static_success:
+        log_pipeline_action("PIPELINE", "Pipeline refresh completed - static succeeded, dynamic failed")
     else:
-        log_pipeline_action("PIPELINE", "Pipeline refresh completed with failures")
+        log_pipeline_action("PIPELINE", "Pipeline refresh completed with failures in both phases")
 
 # Initialize and start the scheduler
 scheduler = BackgroundScheduler()
