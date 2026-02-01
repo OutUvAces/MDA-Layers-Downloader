@@ -19,7 +19,12 @@ import tempfile
 import shutil
 import hashlib
 import time
+import warnings
+import gc
 from pathlib import Path
+
+# Suppress pyogrio RuntimeWarnings (harmless type conversion warnings)
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="pyogrio.raw")
 from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
 from werkzeug.utils import secure_filename
 import threading
@@ -294,6 +299,11 @@ def pregenerate_default_kmls():
         except Exception as e:
             print(f"PREGENERATE: Error processing EEZ data: {e}")
 
+        # Clean up EEZ GeoDataFrame and force garbage collection
+        if 'gdf' in locals():
+            del gdf
+        gc.collect()
+
     # Process WDPA data for MPAs
     wdpa_dir = STATIC_CACHE_DIR / "wdpa"
     wdpa_files = list(wdpa_dir.glob("*.zip"))
@@ -364,8 +374,17 @@ def pregenerate_default_kmls():
             else:
                 print("PREGENERATE: MPA data not loaded or missing iso3 column")
 
+            # Clean up MPA GeoDataFrame and force garbage collection
+            if 'mpa_gdf' in locals() and mpa_gdf is not None:
+                del mpa_gdf
+            gc.collect()
+
         except Exception as e:
             print(f"PREGENERATE: Error processing MPA data: {e}")
+            # Clean up on error too
+            if 'mpa_gdf' in locals() and mpa_gdf is not None:
+                del mpa_gdf
+            gc.collect()
 
     # Process cables (global)
     cables_files = list(STATIC_CACHE_DIR.glob("cables_global.*"))
@@ -431,6 +450,10 @@ def pregenerate_default_kmls():
                     except Exception as simple_error:
                         print(f"PREGENERATE: SimpleKML fallback also failed: {simple_error}")
 
+            # Clean up GeoDataFrame and force garbage collection to release file handles
+            del cables_gdf
+            gc.collect()
+
         except Exception as e:
             print(f"PREGENERATE: Error processing cables data: {e}")
 
@@ -494,10 +517,49 @@ def backup_directory(source_dir: Path, backup_suffix: str) -> Path:
     return backup_dir
 
 def safe_delete_backup(backup_dir: Path):
-    """Safely delete a backup directory."""
-    if backup_dir.exists():
-        shutil.rmtree(backup_dir)
-        print(f"PIPELINE: Deleted backup {backup_dir}")
+    """Safely delete a backup directory with Windows permission handling."""
+    if not backup_dir.exists():
+        return
+
+    log_pipeline_action("BACKUP DELETE", f"Attempting to delete: {backup_dir}")
+
+    # Make all files writable (helps on Windows/OneDrive)
+    for root, dirs, files in os.walk(backup_dir):
+        for d in dirs:
+            try:
+                (Path(root) / d).chmod(0o777)
+            except Exception:
+                pass  # Ignore permission errors during chmod
+        for f in files:
+            try:
+                (Path(root) / f).chmod(0o666)
+            except Exception:
+                pass  # Ignore permission errors during chmod
+
+    # Try deletion with retries
+    for attempt in range(1, 6):
+        try:
+            shutil.rmtree(backup_dir)
+            log_pipeline_action("BACKUP DELETE", f"Successfully deleted: {backup_dir}")
+            return
+        except PermissionError as e:
+            log_pipeline_action("BACKUP DELETE", f"PermissionError on attempt {attempt}/5: {e}. Retrying in 2s...")
+            time.sleep(2)
+            # Force garbage collection to release any lingering file handles
+            gc.collect()
+        except Exception as e:
+            log_pipeline_action("BACKUP DELETE", f"Failed to delete backup {backup_dir}: {e}")
+            break
+
+    # Final fallback - ignore errors
+    try:
+        shutil.rmtree(backup_dir, ignore_errors=True)
+        if backup_dir.exists():
+            log_pipeline_action("BACKUP DELETE", f"Could not delete backup {backup_dir} after retries - manual cleanup needed")
+        else:
+            log_pipeline_action("BACKUP DELETE", f"Backup eventually deleted via ignore_errors")
+    except Exception as e:
+        log_pipeline_action("BACKUP DELETE", f"Final deletion attempt failed: {e}")
 
 def retry_download(func, max_retries=3, backoff_factor=2):
     """Retry a download function with exponential backoff."""
