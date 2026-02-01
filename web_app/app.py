@@ -86,6 +86,10 @@ def start_download():
         # Extract form data
         country = request.form.get('country', '')
         iso_code = request.form.get('iso_code', '')
+        username = request.form.get('nasa_username', '')
+        password = request.form.get('nasa_password', '')
+
+        print(f"MAIN THREAD: Passing NASA creds - username='{username[:3] if username else ''}...', password length={len(password)}")
 
         # Parse layer selections
         layer_settings = LayerSettings(

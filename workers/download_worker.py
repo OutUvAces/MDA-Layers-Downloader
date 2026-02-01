@@ -296,8 +296,8 @@ def worker(
         elif task.type == "cables":
             success = process_cables(task, report_progress, global_output_dir, cache_dir)
         elif task.type == "seastate":
-            if username is None or password is None:
-                report_progress(0, f"→ {task.name} skipped (authentication required)")
+            if not username or not password:
+                report_progress(0, f"→ {task.name} skipped (NASA Earthdata authentication required - provide username/password)")
                 continue
             seastate_dir = country_output_dir if task.clip_to_eez else global_output_dir
             import aiohttp
@@ -472,8 +472,8 @@ async def worker_async(
             async with aiohttp.ClientSession() as session:
                 success = await process_cables_async(session, task, report_progress, global_output_dir, cache_dir)
         elif task.type == "seastate":
-            if username is None or password is None:
-                report_progress(0, f"→ {task.name} skipped (authentication required)")
+            if not username or not password:
+                report_progress(0, f"→ {task.name} skipped (NASA Earthdata authentication required - provide username/password)")
                 return False
             seastate_dir = country_output_dir if task.clip_to_eez else global_output_dir
             async with aiohttp.ClientSession() as session:
