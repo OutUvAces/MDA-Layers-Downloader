@@ -269,99 +269,119 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
         'cables': {'color': '#ffffff', 'opacity': '50'}
     }
 
-    # Process EEZ data for country-specific layers
+    # Process MarineRegions data for country-specific layers
     marineregions_dir = STATIC_CACHE_DIR / "marineregions"
-    # Look for extracted shapefile from the ZIP
-    shp_files = list(marineregions_dir.glob("*.shp"))
-    if shp_files:
-        eez_shp = shp_files[0]
-        print(f"PREGENERATE: Loading EEZ data from {eez_shp}")
-        try:
-            gdf = gpd.read_file(eez_shp)
 
-            # Clean data to prevent OGR translation errors
-            print(f"PREGENERATE: Cleaning EEZ data ({len(gdf)} features)")
-            gdf = gdf[gdf.geometry.is_valid & ~gdf.geometry.is_empty]
+    # Define the layer types and their corresponding shapefiles
+    layer_types = {
+        'EEZ': {
+            'shp_pattern': 'eez*.shp',
+            'color_abgr': 'ff00ffff',  # Yellow
+            'kml_suffix': 'EEZ'
+        },
+        'TTW': {
+            'shp_pattern': 'territorial_seas*.shp',
+            'color_abgr': 'ff00ffff',  # Yellow
+            'kml_suffix': 'TTW'
+        },
+        'Contig': {
+            'shp_pattern': 'contiguous_zones*.shp',
+            'color_abgr': 'ff00ff00',  # Green
+            'kml_suffix': 'Contig'
+        },
+        'ECS': {
+            'shp_pattern': 'ecs*.shp',
+            'color_abgr': 'ff13458b',  # Brown
+            'kml_suffix': 'ECS'
+        }
+    }
 
-            # Fix problematic fields that cause OGR errors
-            for col in gdf.columns:
-                if col in ['mrgid_sov1', 'mrgid_eez', 'mrgid_ter1', 'mrgid_sov2']:
-                    gdf[col] = gdf[col].fillna(0).astype(int)
-                elif gdf[col].dtype == 'object':
-                    # Convert problematic string fields
-                    gdf[col] = gdf[col].fillna('').astype(str)
+    # Find all shapefiles in the marineregions directory
+    all_shp_files = list(marineregions_dir.glob("*.shp"))
+    print(f"PREGENERATE: Found {len(all_shp_files)} shapefiles in marineregions: {[str(f.name) for f in all_shp_files]}")
 
-            # Get unique countries from EEZ data
-            iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
-            if iso_col:
-                countries = gdf[iso_col].unique()
-                countries = [c for c in countries if c and not pd.isna(c)]
-                print(f"PREGENERATE: Found {len(countries)} countries in EEZ data (using column '{iso_col}')")
+    if all_shp_files:
+        # Collect all unique countries from all layer types
+        all_countries = set()
 
-                success_count = 0
-                for country_iso in countries:
-                    try:
-                        country_iso_dir = country_dir / str(country_iso)
-                        country_iso_dir.mkdir(exist_ok=True)
+        for layer_key, layer_info in layer_types.items():
+            shp_files = [f for f in all_shp_files if f.match(layer_info['shp_pattern']) or layer_key.lower() in str(f).lower()]
+            if shp_files:
+                shp_file = shp_files[0]
+                print(f"PREGENERATE: Loading {layer_key} data from {shp_file.name}")
+                try:
+                    gdf = gpd.read_file(shp_file)
 
-                        # Generate country-specific KMLs
-                        country_data = gdf[gdf[iso_col] == country_iso]
+                    # Ensure CRS is EPSG:4326 to prevent pole plotting
+                    if gdf.crs is not None and str(gdf.crs) != 'EPSG:4326':
+                        print(f"PREGENERATE: Converting {layer_key} CRS to EPSG:4326")
+                        gdf = gdf.to_crs('EPSG:4326')
 
-                        if not country_data.empty:
-                            # EEZ - use desktop processing logic
-                            temp_kml = country_iso_dir / f"{country_iso}_EEZ_temp.kml"
-                            eez_kml = country_iso_dir / f"{country_iso}_EEZ.kml"
+                    # Clean data to prevent OGR translation errors
+                    print(f"PREGENERATE: Cleaning {layer_key} data ({len(gdf)} features)")
+                    gdf = gdf[gdf.geometry.is_valid & ~gdf.geometry.is_empty]
 
-                            # Create basic KML first
-                            country_data.to_file(str(temp_kml), driver='KML')
+                    # Make geometries valid and buffer to fix topology issues
+                    gdf['geometry'] = gdf['geometry'].make_valid().buffer(0)
 
-                            # Apply desktop styling (default yellow fill for EEZ)
-                            default_color_abgr = "ff00ffff"  # Yellow with full opacity
-                            if process_kml(str(temp_kml), str(eez_kml), default_color_abgr):
-                                print(f"PREGENERATE: Generated EEZ for {country_iso}")
-                                success_count += 1
-                            else:
-                                print(f"PREGENERATE: Failed to style EEZ for {country_iso}")
+                    # Fix problematic fields that cause OGR errors
+                    for col in gdf.columns:
+                        if col in ['mrgid_sov1', 'mrgid_eez', 'mrgid_ter1', 'mrgid_sov2']:
+                            gdf[col] = gdf[col].fillna(0).astype(int)
+                        elif gdf[col].dtype == 'object':
+                            # Convert problematic string fields
+                            gdf[col] = gdf[col].fillna('').astype(str)
 
-                            # Clean up temp file
-                            if temp_kml.exists():
-                                temp_kml.unlink()
+                    # Get unique countries from this layer
+                    iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
+                    if iso_col:
+                        countries = gdf[iso_col].unique()
+                        countries = [c for c in countries if c and not pd.isna(c)]
+                        all_countries.update(countries)
+                        print(f"PREGENERATE: {layer_key} has {len(countries)} countries")
 
-                            # Territorial waters (simplified - copy EEZ for now)
-                            territorial_kml = country_iso_dir / f"{country_iso}_TTW.kml"
-                            if eez_kml.exists():
-                                import shutil
-                                shutil.copy2(eez_kml, territorial_kml)
-                                print(f"PREGENERATE: Generated TTW for {country_iso} (copied from EEZ)")
+                        # Process each country for this layer
+                        for country_iso in countries:
+                            try:
+                                country_iso_dir = country_dir / str(country_iso)
+                                country_iso_dir.mkdir(exist_ok=True)
 
-                            # Contiguous zone (copy EEZ)
-                            contiguous_kml = country_iso_dir / f"{country_iso}_Contig.kml"
-                            if eez_kml.exists():
-                                shutil.copy2(eez_kml, contiguous_kml)
-                                print(f"PREGENERATE: Generated Contig for {country_iso} (copied from EEZ)")
+                                country_data = gdf[gdf[iso_col] == country_iso]
 
-                            # ECS (copy EEZ)
-                            ecs_kml = country_iso_dir / f"{country_iso}_ECS.kml"
-                            if eez_kml.exists():
-                                shutil.copy2(eez_kml, ecs_kml)
-                                print(f"PREGENERATE: Generated ECS for {country_iso} (copied from EEZ)")
+                                if not country_data.empty:
+                                    # Generate country-specific KML for this layer
+                                    temp_kml = country_iso_dir / f"{country_iso}_{layer_info['kml_suffix']}_temp.kml"
+                                    final_kml = country_iso_dir / f"{country_iso}_{layer_info['kml_suffix']}.kml"
 
-                    except Exception as country_error:
-                        print(f"PREGENERATE: Error processing country {country_iso}: {country_error}")
-                        continue
+                                    # Create basic KML first
+                                    country_data.to_file(str(temp_kml), driver='KML')
 
-                print(f"PREGENERATE: EEZ processing complete - {success_count}/{len(countries)} countries succeeded")
+                                    # Apply desktop styling
+                                    if process_kml(str(temp_kml), str(final_kml), layer_info['color_abgr']):
+                                        print(f"PREGENERATE: Generated {layer_info['kml_suffix']} for {country_iso}")
+                                    else:
+                                        print(f"PREGENERATE: Failed to style {layer_info['kml_suffix']} for {country_iso}")
 
-        except Exception as e:
-            print(f"PREGENERATE: Error processing EEZ data: {e}")
+                                    # Clean up temp file
+                                    if temp_kml.exists():
+                                        temp_kml.unlink()
 
-            # Clean up EEZ GeoDataFrame and force garbage collection
-        if 'gdf' in locals():
-            del gdf
-        gc.collect()
+                            except Exception as country_error:
+                                print(f"PREGENERATE: Error processing {layer_key} for country {country_iso}: {country_error}")
+                                continue
+
+                    # Clean up GeoDataFrame and force garbage collection
+                    del gdf
+                    gc.collect()
+
+                except Exception as e:
+                    print(f"PREGENERATE: Error processing {layer_key} data: {e}")
+                    continue
+
+        print(f"PREGENERATE: Found {len(all_countries)} unique countries across all layers")
 
     else:
-        print("PREGENERATE: No EEZ shapefiles found")
+        print("PREGENERATE: No MarineRegions shapefiles found")
 
     # Process WDPA data for MPAs
     wdpa_dir = STATIC_CACHE_DIR / "wdpa"
@@ -577,12 +597,19 @@ def has_layer_changed(old_layer_hashes: dict, new_layer_hashes: dict, layer_name
         return old_hash != new_hash  # File hash comparison
 
 def backup_directory(source_dir: Path, backup_suffix: str) -> Path:
-    """Create a timestamped backup of a directory."""
+    """Create a timestamped backup of a directory in temp location outside OneDrive."""
+    import tempfile
+
+    # Use system temp directory instead of OneDrive to avoid permission issues
+    temp_base = Path(tempfile.gettempdir()) / "mda_backups"
+    temp_base.mkdir(exist_ok=True)
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_dir = source_dir.parent / f"{source_dir.name}_backup_{timestamp}_{backup_suffix}"
+    backup_dir = temp_base / f"{source_dir.name}_backup_{timestamp}_{backup_suffix}"
+
     if source_dir.exists():
         shutil.copytree(source_dir, backup_dir)
-        print(f"PIPELINE: Backed up {source_dir} to {backup_dir}")
+        print(f"PIPELINE: Backed up {source_dir} to temp location: {backup_dir}")
     return backup_dir
 
 def safe_delete_backup(backup_dir: Path):
@@ -870,10 +897,6 @@ def refresh_caches():
 scheduler = BackgroundScheduler()
 scheduler.add_job(refresh_caches, 'interval', hours=12, id='cache_refresh')
 scheduler.start()
-
-# Initial cache check on startup
-print("APP STARTUP: Checking cache status...")
-refresh_caches()
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -1244,4 +1267,8 @@ def download(task_id, path_type):
     return send_file(zip_path, as_attachment=True, download_name=f'{task_id}_{path_type}.zip')
 
 if __name__ == '__main__':
+    # Initial cache check on startup (only when actually running the app)
+    print("APP STARTUP: Checking cache status...")
+    refresh_caches()
+
     app.run(debug=True, host='0.0.0.0', port=5000)

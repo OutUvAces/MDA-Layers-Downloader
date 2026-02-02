@@ -140,44 +140,81 @@ async def process_async(session, task: LayerTask, report_progress, output_dir: s
                 pass
 
 def refresh_static_caches():
-    """Refresh all static caches for MarineRegions data using WFS shapefile download"""
+    """Refresh all static caches for MarineRegions data using separate shapefile downloads"""
     print("MARINEREGIONS: Refreshing static caches...")
 
     try:
         cache_dir = Path(__file__).parent.parent / "cache" / "raw_source_data" / "static" / "marineregions"
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Download EEZ data using WFS shapefile format
-        print("MARINEREGIONS: Downloading EEZ shapefile via WFS...")
-        eez_url = "https://geo.vliz.be/geoserver/MarineRegions/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=MarineRegions:eez&outputFormat=SHAPE-ZIP"
-        eez_zip = cache_dir / "eez_global.zip"
+        # Force disable SSL verification for MarineRegions (as in original code)
+        import urllib3
+        import requests
+        import zipfile
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-        if not eez_zip.exists():
-            # Force disable SSL verification for MarineRegions (as in original code)
-            import urllib3
-            import requests
-            urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        # Define the MarineRegions layers to download
+        layers = {
+            'eez': {
+                'url': "https://www.marineregions.org/download_file.php?fn=v12_20231025_eez",
+                'zip_name': "eez.zip",
+                'description': "Exclusive Economic Zones"
+            },
+            'territorial_waters': {
+                'url': "https://www.marineregions.org/download_file.php?fn=v4_20231025_territorial_seas",
+                'zip_name': "territorial_seas.zip",
+                'description': "Territorial Waters"
+            },
+            'contiguous_zones': {
+                'url': "https://www.marineregions.org/download_file.php?fn=v4_20231025_contiguous_zones",
+                'zip_name': "contiguous_zones.zip",
+                'description': "Contiguous Zones"
+            },
+            'ecs': {
+                'url': "https://www.marineregions.org/download_file.php?fn=v2_20231025_ecs",
+                'zip_name': "ecs.zip",
+                'description': "Extended Continental Shelf"
+            }
+        }
 
-            response = requests.get(eez_url, timeout=120, verify=False)
-            response.raise_for_status()
+        success_count = 0
 
-            with open(eez_zip, 'wb') as f:
-                f.write(response.content)
+        for layer_key, layer_info in layers.items():
+            try:
+                print(f"MARINEREGIONS: Downloading {layer_info['description']}...")
+                zip_path = cache_dir / layer_info['zip_name']
 
-            print(f"MARINEREGIONS: Downloaded EEZ data, size = {eez_zip.stat().st_size} bytes")
+                if not zip_path.exists():
+                    response = requests.get(layer_info['url'], timeout=120, verify=False)
+                    response.raise_for_status()
 
-            # Extract the ZIP file
-            print("MARINEREGIONS: Extracting EEZ data...")
-            import zipfile
-            with zipfile.ZipFile(eez_zip, 'r') as zip_ref:
-                zip_ref.extractall(cache_dir)
+                    with open(zip_path, 'wb') as f:
+                        f.write(response.content)
 
-            print("MARINEREGIONS: EEZ data extracted")
+                    print(f"MARINEREGIONS: Downloaded {layer_info['description']}, size = {zip_path.stat().st_size} bytes")
+
+                    # Extract the ZIP file
+                    print(f"MARINEREGIONS: Extracting {layer_info['description']}...")
+                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                        zip_ref.extractall(cache_dir)
+
+                    print(f"MARINEREGIONS: {layer_info['description']} extracted")
+                else:
+                    print(f"MARINEREGIONS: {layer_info['description']} already downloaded")
+
+                success_count += 1
+
+            except Exception as layer_error:
+                print(f"MARINEREGIONS: Failed to download/extract {layer_info['description']}: {layer_error}")
+                continue
+
+        if success_count > 0:
+            print(f"MARINEREGIONS: Static caches refreshed - {success_count}/{len(layers)} layers successful")
+            return True
         else:
-            print("MARINEREGIONS: EEZ data already downloaded")
+            print("MARINEREGIONS: No layers were successfully downloaded")
+            return False
 
-        print("MARINEREGIONS: Static caches refreshed")
-        return True
     except Exception as e:
         print(f"MARINEREGIONS: Static cache refresh failed: {e}")
         return False
