@@ -85,7 +85,10 @@
                         </div>
                         <div class="col-md-6 text-end">
                             <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm eez-control" id="eez_color" name="eez_color" value="#0000ff" title="Blue">
+                                <div class="color-picker-container">
+                                    <div class="color-preview" id="eez_color_preview" style="background-color: #0000ff; width: 32px; height: 32px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;"></div>
+                                    <input type="color" class="color-input-overlay" id="eez_color" name="eez_color" value="#0000ff" title="Blue">
+                                </div>
                                 <select class="form-select form-select-sm eez-control" id="eez_opacity" name="eez_opacity">
                                     <option value="10">10%</option>
                                     <option value="20" selected>20%</option>
@@ -119,7 +122,10 @@
                         </div>
                         <div class="col-md-6 text-end">
                             <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm territorial-control" id="territorial_color" name="territorial_color" value="#ffff00" title="Yellow">
+                                <div class="color-picker-container">
+                                    <div class="color-preview" id="territorial_color_preview" style="background-color: #ffff00; width: 32px; height: 32px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;"></div>
+                                    <input type="color" class="color-input-overlay" id="territorial_color" name="territorial_color" value="#ffff00" title="Yellow">
+                                </div>
                                 <select class="form-select form-select-sm territorial-control" id="territorial_opacity" name="territorial_opacity">
                                     <option value="10">10%</option>
                                     <option value="20" selected>20%</option>
@@ -153,7 +159,10 @@
                         </div>
                         <div class="col-md-6 text-end">
                             <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm contiguous-control" id="contiguous_color" name="contiguous_color" value="#00ff00" title="Green">
+                                <div class="color-picker-container">
+                                    <div class="color-preview" id="contiguous_color_preview" style="background-color: #00ff00; width: 32px; height: 32px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;"></div>
+                                    <input type="color" class="color-input-overlay" id="contiguous_color" name="contiguous_color" value="#00ff00" title="Green">
+                                </div>
                                 <select class="form-select form-select-sm contiguous-control" id="contiguous_opacity" name="contiguous_opacity">
                                     <option value="10">10%</option>
                                     <option value="20" selected>20%</option>
@@ -187,7 +196,10 @@
                         </div>
                         <div class="col-md-6 text-end">
                             <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm ecs-control" id="ecs_color" name="ecs_color" value="#8b4513" title="Brown">
+                                <div class="color-picker-container">
+                                    <div class="color-preview" id="ecs_color_preview" style="background-color: #8b4513; width: 32px; height: 32px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;"></div>
+                                    <input type="color" class="color-input-overlay" id="ecs_color" name="ecs_color" value="#8b4513" title="Brown">
+                                </div>
                                 <select class="form-select form-select-sm ecs-control" id="ecs_opacity" name="ecs_opacity">
                                     <option value="10">10%</option>
                                     <option value="20" selected>20%</option>
@@ -221,7 +233,10 @@
                         </div>
                         <div class="col-md-6 text-end">
                             <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm mpa-control" id="mpa_color" name="mpa_color" value="#ff0000" title="Red">
+                                <div class="color-picker-container">
+                                    <div class="color-preview" id="mpa_color_preview" style="background-color: #ff0000; width: 32px; height: 32px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;"></div>
+                                    <input type="color" class="color-input-overlay" id="mpa_color" name="mpa_color" value="#ff0000" title="Red">
+                                </div>
                                 <select class="form-select form-select-sm mpa-control" id="mpa_opacity" name="mpa_opacity">
                                     <option value="10">10%</option>
                                     <option value="20" selected>20%</option>
@@ -260,7 +275,10 @@
                                     <option value="1.5">Medium</option>
                                     <option value="3.0">Low</option>
                                 </select>
-                                <input type="color" class="form-control form-control-color form-control-color-sm seastate-control" id="seastate_color" name="seastate_color" value="#000000" title="Black">
+                                <div class="color-picker-container">
+                                    <div class="color-preview" id="seastate_color_preview" style="background-color: #000000; width: 32px; height: 32px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;"></div>
+                                    <input type="color" class="color-input-overlay" id="seastate_color" name="seastate_color" value="#000000" title="Black">
+                                </div>
                                 <select class="form-select form-select-sm seastate-control" id="seastate_opacity" name="seastate_opacity">
                                     <option value="10">10%</option>
                                     <option value="20">20%</option>
@@ -304,7 +322,10 @@
                                     <option value="1.5">Medium</option>
                                     <option value="3.0" selected>Low</option>
                                 </select>
-                                <input type="color" class="form-control form-control-color form-control-color-sm seastate-control" id="seastate_color_global" name="seastate_color" value="#000000" title="Black">
+                                <div class="color-picker-container">
+                                    <div class="color-preview" id="seastate_color_global_preview" style="background-color: #000000; width: 32px; height: 32px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;"></div>
+                                    <input type="color" class="color-input-overlay" id="seastate_color_global" name="seastate_color" value="#000000" title="Black">
+                                </div>
                                 <select class="form-select form-select-sm seastate-control" id="seastate_opacity_global" name="seastate_opacity">
                                     <option value="10">10%</option>
                                     <option value="20">20%</option>
@@ -338,7 +359,10 @@
                         </div>
                         <div class="col-md-6 text-end">
                             <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm navwarnings-color-control" id="navwarnings_color" name="navwarnings_color" value="#ff0000" title="Red">
+                                <div class="color-picker-container">
+                                    <div class="color-preview" id="navwarnings_color_preview" style="background-color: #ff0000; width: 32px; height: 32px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;"></div>
+                                    <input type="color" class="color-input-overlay" id="navwarnings_color" name="navwarnings_color" value="#ff0000" title="Red">
+                                </div>
                                 <select class="form-select form-select-sm navwarnings-opacity-control" id="navwarnings_opacity" name="navwarnings_opacity">
                                     <option value="10">10%</option>
                                     <option value="20">20%</option>
@@ -378,7 +402,10 @@
                         </div>
                         <div class="col-md-6 text-end">
                             <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm cables-color-control" id="cables_color" name="cables_color" value="#ffffff" title="White">
+                                <div class="color-picker-container">
+                                    <div class="color-preview" id="cables_color_preview" style="background-color: #ffffff; width: 32px; height: 32px; border: 1px solid #ced4da; border-radius: 4px; cursor: pointer;"></div>
+                                    <input type="color" class="color-input-overlay" id="cables_color" name="cables_color" value="#ffffff" title="White">
+                                </div>
                                 <select class="form-select form-select-sm cables-opacity-control" id="cables_opacity" name="cables_opacity">
                                     <option value="10">10%</option>
                                     <option value="20">20%</option>
@@ -421,6 +448,9 @@
 document.addEventListener('DOMContentLoaded', function() {
     // Set up event listeners
     setupEventListeners();
+
+    // Initialize color previews
+    initializeColorPreviews();
 
     // Initialize form state
     updateFormState();
@@ -497,6 +527,7 @@ function updateFormState() {
 function updateCablesControls() {
     const randomChecked = document.getElementById('cables_random').checked;
     const colorControl = document.getElementById('cables_color');
+    const colorPreview = document.getElementById('cables_color_preview');
     const opacityControl = document.getElementById('cables_opacity');
 
     colorControl.disabled = randomChecked;
@@ -504,10 +535,10 @@ function updateCablesControls() {
 
     // Grey out appearance for controls only (not the checkbox)
     if (randomChecked) {
-        colorControl.style.opacity = '0.5';
+        colorPreview.style.opacity = '0.5';
         opacityControl.style.opacity = '0.5';
     } else {
-        colorControl.style.opacity = '1';
+        colorPreview.style.opacity = '1';
         opacityControl.style.opacity = '1';
     }
 }
@@ -516,6 +547,7 @@ function updateCablesControls() {
 function updateNavWarningsControls() {
     const customChecked = document.getElementById('navwarnings_custom').checked;
     const colorControl = document.getElementById('navwarnings_color');
+    const colorPreview = document.getElementById('navwarnings_color_preview');
     const opacityControl = document.getElementById('navwarnings_opacity');
 
     colorControl.disabled = customChecked;
@@ -523,10 +555,10 @@ function updateNavWarningsControls() {
 
     // Grey out appearance for controls only (not the checkbox)
     if (customChecked) {
-        colorControl.style.opacity = '0.5';
+        colorPreview.style.opacity = '0.5';
         opacityControl.style.opacity = '0.5';
     } else {
-        colorControl.style.opacity = '1';
+        colorPreview.style.opacity = '1';
         opacityControl.style.opacity = '1';
     }
 }
@@ -554,31 +586,70 @@ function updateSubmitButton() {
     submitButton.style.opacity = shouldEnable ? '1' : '0.5';
 }
 
+// Initialize color preview synchronization
+function initializeColorPreviews() {
+    // Set up event listeners for all color inputs to sync with previews
+    const colorInputs = [
+        { input: 'eez_color', preview: 'eez_color_preview' },
+        { input: 'territorial_color', preview: 'territorial_color_preview' },
+        { input: 'contiguous_color', preview: 'contiguous_color_preview' },
+        { input: 'ecs_color', preview: 'ecs_color_preview' },
+        { input: 'mpa_color', preview: 'mpa_color_preview' },
+        { input: 'seastate_color', preview: 'seastate_color_preview' },
+        { input: 'seastate_color_global', preview: 'seastate_color_global_preview' },
+        { input: 'navwarnings_color', preview: 'navwarnings_color_preview' },
+        { input: 'cables_color', preview: 'cables_color_preview' }
+    ];
+
+    colorInputs.forEach(({ input, preview }) => {
+        const inputEl = document.getElementById(input);
+        const previewEl = document.getElementById(preview);
+
+        if (inputEl && previewEl) {
+            // Sync preview with input on change
+            inputEl.addEventListener('input', function() {
+                previewEl.style.backgroundColor = this.value;
+            });
+
+            // Sync preview with input on load
+            previewEl.style.backgroundColor = inputEl.value;
+        }
+    });
+}
+
 // Reset styling options to desktop defaults (matching Tkinter preload)
 function resetStylingToDefaults() {
     // Desktop default colors and opacities
     document.getElementById('eez_color').value = '#0000ff';
+    document.getElementById('eez_color_preview').style.backgroundColor = '#0000ff';
     document.getElementById('eez_opacity').value = '20';
 
     document.getElementById('territorial_color').value = '#ffff00';
+    document.getElementById('territorial_color_preview').style.backgroundColor = '#ffff00';
     document.getElementById('territorial_opacity').value = '20';
 
     document.getElementById('contiguous_color').value = '#00ff00';
+    document.getElementById('contiguous_color_preview').style.backgroundColor = '#00ff00';
     document.getElementById('contiguous_opacity').value = '20';
 
     document.getElementById('ecs_color').value = '#8b4513';
+    document.getElementById('ecs_color_preview').style.backgroundColor = '#8b4513';
     document.getElementById('ecs_opacity').value = '20';
 
     document.getElementById('mpa_color').value = '#ff0000';
+    document.getElementById('mpa_color_preview').style.backgroundColor = '#ff0000';
     document.getElementById('mpa_opacity').value = '20';
 
     document.getElementById('cables_color').value = '#ffffff';
+    document.getElementById('cables_color_preview').style.backgroundColor = '#ffffff';
     document.getElementById('cables_opacity').value = '50';
 
     document.getElementById('seastate_color').value = '#000000';
+    document.getElementById('seastate_color_preview').style.backgroundColor = '#000000';
     document.getElementById('seastate_opacity').value = '100';
 
     document.getElementById('navwarnings_color').value = '#ff0000';
+    document.getElementById('navwarnings_color_preview').style.backgroundColor = '#ff0000';
     document.getElementById('navwarnings_opacity').value = '80';
 
     // Reset density selections - NEVER default to Medium (desktop behavior)

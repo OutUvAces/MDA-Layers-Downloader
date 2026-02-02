@@ -12,8 +12,30 @@
     box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
 }
 
-.color-picker {
+.color-picker-container {
+    position: relative;
+    display: inline-block;
+}
+
+.color-preview {
+    transition: border-color 0.2s ease;
+}
+
+.color-preview:hover {
+    border-color: #0d6efd;
+}
+
+.color-input-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 32px;
+    height: 32px;
+    opacity: 0;
     cursor: pointer;
+    border: none;
+    padding: 0;
+    margin: 0;
 }
 
 .progress-container {
