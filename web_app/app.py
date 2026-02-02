@@ -567,25 +567,123 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
         nav_file = max(nav_files, key=lambda x: x.stat().st_mtime)
         print(f"PREGENERATE: Processing nav warnings from {nav_file}")
         try:
-            # For now, create a simple placeholder KML
+            # Load the navigation warnings data
+            with open(nav_file, 'r', encoding='utf-8') as f:
+                nav_data = json.load(f)
+
             # Use today's date for the filename
             today = datetime.now().strftime("%d%m%Y")
             nav_kml = global_dir / f"NAVWARN_{today}.kml"
-            # In real implementation, would parse the nav data and create proper KML
-            with open(nav_kml, 'w', encoding='utf-8') as f:
-                f.write("""<?xml version="1.0" encoding="UTF-8"?>
+
+            # Create KML content
+            kml_content = """<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
     <name>Navigation Warnings</name>
+    <Style id="navWarningStyle">
+      <IconStyle>
+        <color>ff0000ff</color>
+        <scale>0.8</scale>
+        <Icon>
+          <href>http://maps.google.com/mapfiles/kml/shapes/caution.png</href>
+        </Icon>
+      </IconStyle>
+      <LineStyle>
+        <color>ff0000ff</color>
+        <width>3</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>40ff0000</color>
+        <outline>1</outline>
+      </PolyStyle>
+    </Style>"""
+
+            features = nav_data.get('features', [])
+            if not features:
+                # Empty warnings
+                kml_content += """
     <Placemark>
-      <name>Navigation Warnings Data</name>
+      <name>No Active Navigation Warnings</name>
+      <description>No active navigation warnings found.</description>
       <Point>
         <coordinates>0,0,0</coordinates>
       </Point>
-    </Placemark>
+    </Placemark>"""
+            else:
+                # Create placemarks for each warning
+                for i, feature in enumerate(features):
+                    properties = feature.get('properties', {})
+                    geometry = feature.get('geometry', {})
+
+                    name = properties.get('title', f'NAV WARNING {i+1}')
+                    description = properties.get('description', 'Navigation warning')
+
+                    # Format description with HTML
+                    html_desc = f"<b>{name}</b><br>"
+                    html_desc += f"<b>NAVAREA:</b> {properties.get('navarea', 'Unknown')}<br>"
+                    if properties.get('msg_number') and properties.get('msg_year'):
+                        html_desc += f"<b>Warning:</b> {properties.get('msg_number')}/{properties.get('msg_year')}<br>"
+                    html_desc += f"<b>Source:</b> {properties.get('source', 'NGA MSI')}<br><br>"
+                    html_desc += description.replace('\n', '<br>')
+
+                    geom_type = geometry.get('type', '')
+                    coordinates = geometry.get('coordinates', [])
+
+                    if geom_type == 'Point' and coordinates:
+                        # Single point
+                        lon, lat = coordinates[0], coordinates[1] if len(coordinates) >= 2 else (0, 0)
+                        kml_content += f"""
+    <Placemark>
+      <name>{name}</name>
+      <description>{html_desc}</description>
+      <styleUrl>#navWarningStyle</styleUrl>
+      <Point>
+        <coordinates>{lon},{lat},0</coordinates>
+      </Point>
+    </Placemark>"""
+
+                    elif geom_type == 'LineString' and coordinates:
+                        # Line string
+                        coord_str = ' '.join([f"{lon},{lat},0" for lon, lat in coordinates])
+                        kml_content += f"""
+    <Placemark>
+      <name>{name}</name>
+      <description>{html_desc}</description>
+      <styleUrl>#navWarningStyle</styleUrl>
+      <LineString>
+        <coordinates>{coord_str}</coordinates>
+      </LineString>
+    </Placemark>"""
+
+                    elif geom_type == 'Polygon' and coordinates:
+                        # Polygon (coordinates is array of rings)
+                        outer_ring = coordinates[0] if coordinates else []
+                        if outer_ring:
+                            coord_str = ' '.join([f"{lon},{lat},0" for lon, lat in outer_ring])
+                            kml_content += f"""
+    <Placemark>
+      <name>{name}</name>
+      <description>{html_desc}</description>
+      <styleUrl>#navWarningStyle</styleUrl>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>{coord_str}</coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>"""
+
+            kml_content += """
   </Document>
-</kml>""")
-            print(f"PREGENERATE: Generated {nav_kml}")
+</kml>"""
+
+            # Write the KML file
+            with open(nav_kml, 'w', encoding='utf-8') as f:
+                f.write(kml_content)
+
+            total_warnings = len(features)
+            print(f"PREGENERATE: Generated {nav_kml} with {total_warnings} navigation warnings")
 
         except Exception as e:
             print(f"PREGENERATE: Error processing nav warnings: {e}")
