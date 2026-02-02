@@ -64,6 +64,9 @@ os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 progress_data = {}
 current_tasks = {}
 
+# Global flag to ensure cache refresh runs only once on startup
+cache_initialized = False
+
 # Cache configuration
 CACHE_DIR = Path(__file__).parent.parent / "cache"
 RAW_SOURCE_DIR = CACHE_DIR / "raw_source_data"
@@ -1302,8 +1305,10 @@ def download(task_id, path_type):
     return send_file(zip_path, as_attachment=True, download_name=f'{task_id}_{path_type}.zip')
 
 if __name__ == '__main__':
-    # Initial cache check on startup (only when actually running the app)
-    print("APP STARTUP: Checking cache status...")
-    refresh_caches()
+    # Initial cache check on startup (only once, not on Flask restarts)
+    if not cache_initialized:
+        print("APP STARTUP: Checking cache status and pre-generating KMLs...")
+        refresh_caches()
+        cache_initialized = True
 
     app.run(debug=True, host='0.0.0.0', port=5000)
