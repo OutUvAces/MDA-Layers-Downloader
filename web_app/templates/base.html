@@ -15,10 +15,19 @@
             padding: 1rem;
             margin-bottom: 1rem;
         }
-        .color-picker {
-            width: 60px;
-            height: 30px;
+        .color-picker, input[type="color"] {
+            width: 40px !important;
+            height: 40px !important;
             border: 1px solid #ced4da;
+            border-radius: 0.25rem;
+            padding: 0;
+            cursor: pointer;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper {
+            padding: 0;
+        }
+        input[type="color"]::-webkit-color-swatch {
+            border: none;
             border-radius: 0.25rem;
         }
         .progress-container {

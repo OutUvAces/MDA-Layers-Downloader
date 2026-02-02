@@ -61,7 +61,7 @@
 
                 <!-- Reset to Defaults Button -->
                 <div class="text-end mb-3">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetStylingToDefaults()">
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetStylingToDefaults()" id="reset_button">
                         <i class="fas fa-undo"></i> Reset to Defaults
                     </button>
                 </div>
@@ -81,7 +81,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">
-                                    Source: MarineRegions (marine regions.org)
+                                    <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">Marine Regions</a>
                                 </a>
                             </small>
                         </div>
@@ -115,7 +115,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">
-                                    Source: MarineRegions (marine regions.org)
+                                    <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">Marine Regions</a>
                                 </a>
                             </small>
                         </div>
@@ -149,7 +149,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">
-                                    Source: MarineRegions (marine regions.org)
+                                    <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">Marine Regions</a>
                                 </a>
                             </small>
                         </div>
@@ -183,7 +183,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">
-                                    Source: MarineRegions (marine regions.org)
+                                    <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">Marine Regions</a>
                                 </a>
                             </small>
                         </div>
@@ -217,7 +217,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://www.protectedplanet.net/en/thematic-areas/marine-protected-areas" target="_blank" class="text-decoration-none">
-                                    Source: Protected Planet WDPA (protectedplanet.net)
+                                    <a href="https://www.protectedplanet.net/en/thematic-areas/marine-protected-areas" target="_blank" class="text-decoration-none">Protected Planet (WDPA)</a>
                                 </a>
                             </small>
                         </div>
@@ -251,7 +251,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://podaac.jpl.nasa.gov/dataset/OSCAR_L4_OC_NRT_V2.0" target="_blank" class="text-decoration-none">
-                                    Source: NASA OSCAR NRT (podaac.jpl.nasa.gov)
+                                    <a href="https://podaac.jpl.nasa.gov/dataset/OSCAR_L4_OC_NRT_V2.0" target="_blank" class="text-decoration-none">NASA OSCAR NRT</a>
                                 </a>
                             </small>
                         </div>
@@ -295,7 +295,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://podaac.jpl.nasa.gov/dataset/OSCAR_L4_OC_NRT_V2.0" target="_blank" class="text-decoration-none">
-                                    Source: NASA OSCAR NRT (podaac.jpl.nasa.gov)
+                                    <a href="https://podaac.jpl.nasa.gov/dataset/OSCAR_L4_OC_NRT_V2.0" target="_blank" class="text-decoration-none">NASA OSCAR NRT</a>
                                 </a>
                             </small>
                         </div>
@@ -334,7 +334,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://msi.nga.mil/NavWarnings" target="_blank" class="text-decoration-none">
-                                    Source: NGA MSI (msi.nga.mil)
+                                    <a href="https://msi.nga.mil/NavWarnings" target="_blank" class="text-decoration-none">NGA MSI</a>
                                 </a>
                             </small>
                         </div>
@@ -374,7 +374,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://www.submarinecablemap.com/" target="_blank" class="text-decoration-none">
-                                    Source: SubmarineCableMap (submarinecablemap.com)
+                                    <a href="https://www.submarinecablemap.com/" target="_blank" class="text-decoration-none">SubmarineCableMap</a>
                                 </a>
                             </small>
                         </div>
@@ -405,219 +405,6 @@
                 </div>
 
                 <!-- Country-Specific Layers Section -->
-                <div class="layer-card">
-                    <h5 class="mb-3"><i class="fas fa-flag"></i> Country-Specific Layers</h5>
-
-                    <!-- EEZ -->
-                    <div class="row mb-2 align-items-center">
-                        <div class="col-md-6">
-                            <div class="form-check mb-0">
-                                <input class="form-check-input layer-checkbox" type="checkbox" id="eez" name="eez">
-                                <label class="form-check-label fw-bold" for="eez">
-                                    Exclusive Economic Zone (200nm)
-                                </label>
-                            </div>
-                            <small class="text-muted ms-3">
-                                <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">
-                                    Source: MarineRegions (marine regions.org)
-                                </a>
-                            </small>
-                        </div>
-                        <div class="col-md-6 text-end">
-                            <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm eez-control" id="eez_color" name="eez_color" value="#0000ff" title="Blue">
-                                <select class="form-select form-select-sm eez-control" id="eez_opacity" name="eez_opacity">
-                                    <option value="10">10%</option>
-                                    <option value="20" selected>20%</option>
-                                    <option value="30">30%</option>
-                                    <option value="40">40%</option>
-                                    <option value="50">50%</option>
-                                    <option value="60">60%</option>
-                                    <option value="70">70%</option>
-                                    <option value="80">80%</option>
-                                    <option value="90">90%</option>
-                                    <option value="100">100%</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Territorial Waters -->
-                    <div class="row mb-2 align-items-center">
-                        <div class="col-md-6">
-                            <div class="form-check mb-0">
-                                <input class="form-check-input layer-checkbox" type="checkbox" id="territorial" name="territorial">
-                                <label class="form-check-label fw-bold" for="territorial">
-                                    Territorial Waters (12nm)
-                                </label>
-                            </div>
-                            <small class="text-muted ms-3">
-                                <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">
-                                    Source: MarineRegions (marine regions.org)
-                                </a>
-                            </small>
-                        </div>
-                        <div class="col-md-6 text-end">
-                            <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm territorial-control" id="territorial_color" name="territorial_color" value="#ffff00" title="Yellow">
-                                <select class="form-select form-select-sm territorial-control" id="territorial_opacity" name="territorial_opacity">
-                                    <option value="10">10%</option>
-                                    <option value="20" selected>20%</option>
-                                    <option value="30">30%</option>
-                                    <option value="40">40%</option>
-                                    <option value="50">50%</option>
-                                    <option value="60">60%</option>
-                                    <option value="70">70%</option>
-                                    <option value="80">80%</option>
-                                    <option value="90">90%</option>
-                                    <option value="100">100%</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Contiguous Zone -->
-                    <div class="row mb-2 align-items-center">
-                        <div class="col-md-6">
-                            <div class="form-check mb-0">
-                                <input class="form-check-input layer-checkbox" type="checkbox" id="contiguous" name="contiguous">
-                                <label class="form-check-label fw-bold" for="contiguous">
-                                    Contiguous Zone (24nm)
-                                </label>
-                            </div>
-                            <small class="text-muted ms-3">
-                                <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">
-                                    Source: MarineRegions (marine regions.org)
-                                </a>
-                            </small>
-                        </div>
-                        <div class="col-md-6 text-end">
-                            <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm contiguous-control" id="contiguous_color" name="contiguous_color" value="#00ff00" title="Green">
-                                <select class="form-select form-select-sm contiguous-control" id="contiguous_opacity" name="contiguous_opacity">
-                                    <option value="10">10%</option>
-                                    <option value="20" selected>20%</option>
-                                    <option value="30">30%</option>
-                                    <option value="40">40%</option>
-                                    <option value="50">50%</option>
-                                    <option value="60">60%</option>
-                                    <option value="70">70%</option>
-                                    <option value="80">80%</option>
-                                    <option value="90">90%</option>
-                                    <option value="100">100%</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Extended Continental Shelf -->
-                    <div class="row mb-2 align-items-center">
-                        <div class="col-md-6">
-                            <div class="form-check mb-0">
-                                <input class="form-check-input layer-checkbox" type="checkbox" id="ecs" name="ecs">
-                                <label class="form-check-label fw-bold" for="ecs">
-                                    Extended Continental Shelf
-                                </label>
-                            </div>
-                            <small class="text-muted ms-3">
-                                <a href="https://www.marineregions.org/" target="_blank" class="text-decoration-none">
-                                    Source: MarineRegions (marine regions.org)
-                                </a>
-                            </small>
-                        </div>
-                        <div class="col-md-6 text-end">
-                            <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm ecs-control" id="ecs_color" name="ecs_color" value="#8b4513" title="Brown">
-                                <select class="form-select form-select-sm ecs-control" id="ecs_opacity" name="ecs_opacity">
-                                    <option value="10">10%</option>
-                                    <option value="20" selected>20%</option>
-                                    <option value="30">30%</option>
-                                    <option value="40">40%</option>
-                                    <option value="50">50%</option>
-                                    <option value="60">60%</option>
-                                    <option value="70">70%</option>
-                                    <option value="80">80%</option>
-                                    <option value="90">90%</option>
-                                    <option value="100">100%</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Marine Protected Areas -->
-                    <div class="row mb-2 align-items-center">
-                        <div class="col-md-6">
-                            <div class="form-check mb-0">
-                                <input class="form-check-input layer-checkbox" type="checkbox" id="mpa" name="mpa">
-                                <label class="form-check-label fw-bold" for="mpa">
-                                    Marine Protected Areas
-                                </label>
-                            </div>
-                            <small class="text-muted ms-3">
-                                <a href="https://www.protectedplanet.net/en/thematic-areas/marine-protected-areas" target="_blank" class="text-decoration-none">
-                                    Source: Protected Planet WDPA (protectedplanet.net)
-                                </a>
-                            </small>
-                        </div>
-                        <div class="col-md-6 text-end">
-                            <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm mpa-control" id="mpa_color" name="mpa_color" value="#ff0000" title="Red">
-                                <select class="form-select form-select-sm mpa-control" id="mpa_opacity" name="mpa_opacity">
-                                    <option value="10">10%</option>
-                                    <option value="20" selected>20%</option>
-                                    <option value="30">30%</option>
-                                    <option value="40">40%</option>
-                                    <option value="50">50%</option>
-                                    <option value="60">60%</option>
-                                    <option value="70">70%</option>
-                                    <option value="80">80%</option>
-                                    <option value="90">90%</option>
-                                    <option value="100">100%</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Ocean Currents (Country) -->
-                    <div class="row mb-3 align-items-center">
-                        <div class="col-md-6">
-                            <div class="form-check mb-0">
-                                <input class="form-check-input layer-checkbox" type="checkbox" id="seastate_country" name="seastate_country">
-                                <label class="form-check-label fw-bold" for="seastate_country">
-                                    Ocean Currents (Country)
-                                </label>
-                            </div>
-                            <small class="text-muted ms-3">
-                                <a href="https://podaac.jpl.nasa.gov/dataset/OSCAR_L4_OC_NRT_V2.0" target="_blank" class="text-decoration-none">
-                                    Source: NASA OSCAR NRT (podaac.jpl.nasa.gov)
-                                </a>
-                            </small>
-                        </div>
-                        <div class="col-md-6 text-end">
-                            <div class="d-inline-flex align-items-center gap-2">
-                                <input type="color" class="form-control form-control-color form-control-color-sm seastate-control" id="seastate_color" name="seastate_color" value="#000000" title="Black">
-                                <select class="form-select form-select-sm seastate-control" id="seastate_opacity" name="seastate_opacity">
-                                    <option value="10">10%</option>
-                                    <option value="20">20%</option>
-                                    <option value="30">30%</option>
-                                    <option value="40">40%</option>
-                                    <option value="50">50%</option>
-                                    <option value="60">60%</option>
-                                    <option value="70">70%</option>
-                                    <option value="80">80%</option>
-                                    <option value="90">90%</option>
-                                    <option value="100" selected>100%</option>
-                                </select>
-                                <select class="form-select form-select-sm" id="seastate_density_country" name="seastate_density_country">
-                                    <option value="0.5" selected>High</option>
-                                    <option value="1.5">Medium</option>
-                                    <option value="3.0">Low</option>
-                                </select>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Submit Button -->
                     <div class="d-grid">
                         <button type="submit" id="submit_button" class="btn btn-primary btn-lg" disabled style="opacity: 0.5;">

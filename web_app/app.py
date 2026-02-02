@@ -1303,13 +1303,26 @@ def download(task_id, path_type):
     return send_file(zip_path, as_attachment=True, download_name=f'{task_id}_{path_type}.zip')
 
 if __name__ == '__main__':
-    # Initial cache check on startup (only once, using persistent file)
-    if not CACHE_INITIALIZED_FILE.exists():
-        print("APP STARTUP: Checking cache status and pre-generating KMLs...")
+    # Initial cache check on startup - run if cache is missing/empty regardless of flag
+    cache_needs_init = (
+        not CACHE_INITIALIZED_FILE.exists() or
+        not STATIC_CACHE_DIR.exists() or
+        not any(STATIC_CACHE_DIR.iterdir()) or  # Check if static cache is empty
+        not DYNAMIC_CACHE_DIR.exists()
+    )
+
+    if cache_needs_init:
+        print("APP STARTUP: Cache missing or empty - running initial setup...")
+        # Delete any stale flag file
+        if CACHE_INITIALIZED_FILE.exists():
+            CACHE_INITIALIZED_FILE.unlink()
+        # Run cache refresh
         refresh_caches()
         # Create initialization flag file
         CACHE_INITIALIZED_FILE.parent.mkdir(parents=True, exist_ok=True)
         CACHE_INITIALIZED_FILE.write_text("initialized")
         print("APP STARTUP: Cache initialization completed and marked as done")
+    else:
+        print("APP STARTUP: Cache already initialized - skipping setup")
 
     app.run(debug=True, host='0.0.0.0', port=5000)
