@@ -237,7 +237,7 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
     import zipfile
     import xml.etree.ElementTree as ET
     from shapely import wkt
-    from processing.kml_style import process_kml, process_line_kml
+    from processing.kml_style import download_kml, process_kml, process_line_kml
     from core.utils import hex_to_kml_abgr
 
     country_dir = PREGENERATED_DIR / "country"
@@ -259,129 +259,103 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
             print("PREGENERATE: No layers changed - skipping regeneration")
             return
 
-    # Default styling (from LayerSettings defaults)
-    default_styles = {
-        'territorial': {'color': '#ffff00', 'opacity': '20'},
-        'contiguous': {'color': '#00ff00', 'opacity': '20'},
-        'eez': {'color': '#0000ff', 'opacity': '20'},
-        'ecs': {'color': '#8B4513', 'opacity': '20'},
-        'mpa': {'color': '#ff0000', 'opacity': '20'},
-        'cables': {'color': '#ffffff', 'opacity': '50'}
-    }
+    # Default styling (from config defaults, converted to ABGR)
+    from core.config import DEFAULT_COLORS, DEFAULT_OPACITIES
+    default_styles = {}
+    for layer_type in ['territorial', 'contiguous', 'eez', 'ecs', 'mpa', 'cables']:
+        color_abgr = hex_to_kml_abgr(DEFAULT_COLORS[layer_type], int(DEFAULT_OPACITIES[layer_type]))
+        default_styles[layer_type] = {'color_abgr': color_abgr}
 
-    # Process MarineRegions data for country-specific layers
-    marineregions_dir = STATIC_CACHE_DIR / "marineregions"
+    # Get countries list from MarineRegions (reuse main branch approach)
+    print("PREGENERATE: Getting countries list from MarineRegions...")
+    countries_url = "https://geo.vliz.be/geoserver/MarineRegions/wfs?service=WFS&version=1.1.0&request=GetFeature&typeName=MarineRegions:eez_12nm&outputFormat=application/json&propertyName=territory1,iso_ter1"
 
-    # Define the layer types and their corresponding shapefiles
-    layer_types = {
-        'EEZ': {
-            'shp_pattern': 'eez*.shp',
-            'color_abgr': 'ff00ffff',  # Yellow
-            'kml_suffix': 'EEZ'
+    try:
+        import requests
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+        response = requests.get(countries_url, timeout=30, verify=False)
+        response.raise_for_status()
+        countries_data = response.json()
+
+        # Extract unique ISO codes
+        iso_codes = set()
+        for feature in countries_data.get('features', []):
+            props = feature.get('properties', {})
+            iso_code = props.get('iso_ter1')
+            if iso_code and iso_code.strip():
+                iso_codes.add(iso_code.strip())
+
+        all_countries = sorted(list(iso_codes))
+        print(f"PREGENERATE: Found {len(all_countries)} countries from MarineRegions")
+
+    except Exception as e:
+        print(f"PREGENERATE: Failed to get countries list: {e}")
+        # Fallback to hardcoded list
+        all_countries = ['USA', 'CAN', 'MEX', 'GBR', 'FRA', 'DEU', 'JPN', 'AUS', 'NZL', 'CHN', 'IND', 'BRA', 'ARG', 'CHL', 'ZAF', 'NOR', 'SWE', 'DNK', 'FIN', 'ISL', 'GRL', 'FRO']
+        print(f"PREGENERATE: Using fallback countries list: {len(all_countries)} countries")
+
+    # Define MarineRegions WFS URLs (matching main branch)
+    marineregions_base = "https://geo.vliz.be/geoserver/MarineRegions/wfs"
+
+    layer_configs = {
+        'territorial': {
+            'type_name': 'MarineRegions:eez_12nm',
+            'kml_suffix': 'territorial_waters'
         },
-        'TTW': {
-            'shp_pattern': 'territorial_seas*.shp',
-            'color_abgr': 'ff00ffff',  # Yellow
-            'kml_suffix': 'TTW'
+        'contiguous': {
+            'type_name': 'MarineRegions:eez_24nm',
+            'kml_suffix': 'contiguous_zone'
         },
-        'Contig': {
-            'shp_pattern': 'contiguous_zones*.shp',
-            'color_abgr': 'ff00ff00',  # Green
-            'kml_suffix': 'Contig'
+        'eez': {
+            'type_name': 'MarineRegions:eez',
+            'kml_suffix': 'eez'
         },
-        'ECS': {
-            'shp_pattern': 'ecs*.shp',
-            'color_abgr': 'ff13458b',  # Brown
-            'kml_suffix': 'ECS'
+        'ecs': {
+            'type_name': 'MarineRegions:ecs',
+            'kml_suffix': 'ecs'
         }
     }
 
-    # Find all shapefiles in the marineregions directory
-    all_shp_files = list(marineregions_dir.glob("*.shp"))
-    print(f"PREGENERATE: Found {len(all_shp_files)} shapefiles in marineregions: {[str(f.name) for f in all_shp_files]}")
+    # Process each country and layer type (matching main branch approach)
+    for country_iso in all_countries:
+        try:
+            country_iso_dir = country_dir / str(country_iso)
+            country_iso_dir.mkdir(exist_ok=True)
 
-    if all_shp_files:
-        # Collect all unique countries from all layer types
-        all_countries = set()
-
-        for layer_key, layer_info in layer_types.items():
-            shp_files = [f for f in all_shp_files if f.match(layer_info['shp_pattern']) or layer_key.lower() in str(f).lower()]
-            if shp_files:
-                shp_file = shp_files[0]
-                print(f"PREGENERATE: Loading {layer_key} data from {shp_file.name}")
+            for layer_key, config in layer_configs.items():
                 try:
-                    gdf = gpd.read_file(shp_file)
+                    # Build WFS KML URL (matching main branch)
+                    wfs_url = f"{marineregions_base}?service=WFS&version=1.1.0&request=GetFeature&typeName={config['type_name']}&outputFormat=KML&CQL_FILTER=iso_ter1='{country_iso}'"
 
-                    # Ensure CRS is EPSG:4326 to prevent pole plotting
-                    if gdf.crs is not None and str(gdf.crs) != 'EPSG:4326':
-                        print(f"PREGENERATE: Converting {layer_key} CRS to EPSG:4326")
-                        gdf = gdf.to_crs('EPSG:4326')
+                    # Download and process KML (matching main branch marineregions.py)
+                    temp_kml = country_iso_dir / f"{country_iso}_{config['kml_suffix']}_temp.kml"
+                    final_kml = country_iso_dir / f"{country_iso}_{config['kml_suffix']}.kml"
 
-                    # Clean data to prevent OGR translation errors
-                    print(f"PREGENERATE: Cleaning {layer_key} data ({len(gdf)} features)")
-                    gdf = gdf[gdf.geometry.is_valid & ~gdf.geometry.is_empty]
+                    # Download KML from MarineRegions WFS
+                    if download_kml(wfs_url, str(temp_kml)):
+                        # Apply styling using process_kml from main branch
+                        if process_kml(str(temp_kml), str(final_kml), default_styles[layer_key]['color_abgr']):
+                            print(f"PREGENERATE: Generated {config['kml_suffix']} for {country_iso}")
+                        else:
+                            print(f"PREGENERATE: Failed to style {config['kml_suffix']} for {country_iso}")
+                    else:
+                        print(f"PREGENERATE: Failed to download {config['kml_suffix']} KML for {country_iso}")
 
-                    # Make geometries valid and buffer to fix topology issues
-                    gdf['geometry'] = gdf['geometry'].make_valid().buffer(0)
+                    # Clean up temp file
+                    if temp_kml.exists():
+                        temp_kml.unlink()
 
-                    # Fix problematic fields that cause OGR errors
-                    for col in gdf.columns:
-                        if col in ['mrgid_sov1', 'mrgid_eez', 'mrgid_ter1', 'mrgid_sov2']:
-                            gdf[col] = gdf[col].fillna(0).astype(int)
-                        elif gdf[col].dtype == 'object':
-                            # Convert problematic string fields
-                            gdf[col] = gdf[col].fillna('').astype(str)
-
-                    # Get unique countries from this layer
-                    iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
-                    if iso_col:
-                        countries = gdf[iso_col].unique()
-                        countries = [c for c in countries if c and not pd.isna(c)]
-                        all_countries.update(countries)
-                        print(f"PREGENERATE: {layer_key} has {len(countries)} countries")
-
-                        # Process each country for this layer
-                        for country_iso in countries:
-                            try:
-                                country_iso_dir = country_dir / str(country_iso)
-                                country_iso_dir.mkdir(exist_ok=True)
-
-                                country_data = gdf[gdf[iso_col] == country_iso]
-
-                                if not country_data.empty:
-                                    # Generate country-specific KML for this layer
-                                    temp_kml = country_iso_dir / f"{country_iso}_{layer_info['kml_suffix']}_temp.kml"
-                                    final_kml = country_iso_dir / f"{country_iso}_{layer_info['kml_suffix']}.kml"
-
-                                    # Create basic KML first
-                                    country_data.to_file(str(temp_kml), driver='KML')
-
-                                    # Apply desktop styling
-                                    if process_kml(str(temp_kml), str(final_kml), layer_info['color_abgr']):
-                                        print(f"PREGENERATE: Generated {layer_info['kml_suffix']} for {country_iso}")
-                                    else:
-                                        print(f"PREGENERATE: Failed to style {layer_info['kml_suffix']} for {country_iso}")
-
-                                    # Clean up temp file
-                                    if temp_kml.exists():
-                                        temp_kml.unlink()
-
-                            except Exception as country_error:
-                                print(f"PREGENERATE: Error processing {layer_key} for country {country_iso}: {country_error}")
-                                continue
-
-                    # Clean up GeoDataFrame and force garbage collection
-                    del gdf
-                    gc.collect()
-
-                except Exception as e:
-                    print(f"PREGENERATE: Error processing {layer_key} data: {e}")
+                except Exception as layer_error:
+                    print(f"PREGENERATE: Error processing {layer_key} for {country_iso}: {layer_error}")
                     continue
 
-        print(f"PREGENERATE: Found {len(all_countries)} unique countries across all layers")
+        except Exception as country_error:
+            print(f"PREGENERATE: Error processing country {country_iso}: {country_error}")
+            continue
 
-    else:
-        print("PREGENERATE: No MarineRegions shapefiles found")
+    print(f"PREGENERATE: MarineRegions processing complete - processed {len(all_countries)} countries")
 
     # Process WDPA data for MPAs
     wdpa_dir = STATIC_CACHE_DIR / "wdpa"
