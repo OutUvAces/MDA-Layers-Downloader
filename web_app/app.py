@@ -492,17 +492,13 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                             if available_columns:
                                 country_mpa = country_mpa[available_columns]
 
-                            # Add geometry simplification to make files smaller/faster
+                            # Skip geometry simplification to avoid KeyboardInterrupt - keep original geometries
                             import time
                             start_time = time.time()
 
                             try:
-                                # Simplify geometries (0.002 degrees ~ 200m at equator)
-                                country_mpa_copy = country_mpa.copy()
-                                country_mpa_copy['geometry'] = country_mpa_copy.geometry.simplify(0.002, preserve_topology=True)
-
-                                # Create basic KML first (try fiona driver instead of pyogrio for better performance)
-                                country_mpa_copy.to_file(str(temp_kml), driver='KML', engine='fiona')
+                                # Create basic KML first (use default geopandas KML driver - no engine parameter)
+                                country_mpa.to_file(str(temp_kml), driver='KML')
 
                                 # Apply desktop MPA styling (red fill)
                                 mpa_color_abgr = "ff0000ff"  # Red with full opacity
@@ -775,12 +771,23 @@ def refresh_static_data():
     metadata = load_cache_metadata()
     static_dir = RAW_SOURCE_DIR / "static"
 
-    # Check if refresh is needed (30 days OR manual flag)
+    # Check if refresh is needed (30 days OR manual flag OR missing shapefiles)
     static_age_days = get_cache_age(metadata.get('last_refresh_static'), 'days')
     static_changed_flag = metadata.get('static_changed', False)
 
-    if static_age_days <= 30 and not static_changed_flag:
-        log_pipeline_action("STATIC REFRESH", f"Skipped - age {static_age_days:.1f} days, no change flag")
+    # Also check if shapefiles actually exist
+    marineregions_dir = static_dir / "marineregions"
+    wdpa_dir = static_dir / "wdpa"
+    cables_dir = static_dir / "cables_global.geojson"
+
+    shapefiles_missing = (
+        not marineregions_dir.exists() or not any(marineregions_dir.glob("*.shp")) or
+        not wdpa_dir.exists() or not any(wdpa_dir.glob("*.zip")) or
+        not cables_dir.exists()
+    )
+
+    if static_age_days <= 30 and not static_changed_flag and not shapefiles_missing:
+        log_pipeline_action("STATIC REFRESH", f"Skipped - age {static_age_days:.1f} days, no change flag, shapefiles exist")
         return True  # Not an error, just no refresh needed
 
     log_pipeline_action("STATIC REFRESH", f"Refresh triggered - age {static_age_days:.1f} days, change flag: {static_changed_flag}")
@@ -1346,4 +1353,10 @@ if __name__ == '__main__':
     else:
         print("APP STARTUP: Cache already initialized - skipping setup")
 
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Only run Flask app if all required modules are available
+    try:
+        from flask import Flask
+        app.run(debug=True, host='0.0.0.0', port=5000)
+    except ImportError as e:
+        print(f"Flask not available, skipping web server: {e}")
+        print("Cache refresh completed successfully!")

@@ -181,10 +181,28 @@ def refresh_static_caches():
 
         for layer_key, layer_info in layers.items():
             try:
-                print(f"MARINEREGIONS: Downloading {layer_info['description']}...")
+                print(f"MARINEREGIONS: Processing {layer_info['description']}...")
                 zip_path = cache_dir / layer_info['zip_name']
 
+                # Check if shapefiles already exist for this layer
+                expected_shp = None
+                if layer_key == 'eez':
+                    expected_shp = cache_dir / "eez.shp"
+                elif layer_key == 'territorial_seas':
+                    expected_shp = cache_dir / "territorial_seas.shp"
+                elif layer_key == 'contiguous_zones':
+                    expected_shp = cache_dir / "contiguous_zones.shp"
+                elif layer_key == 'ecs':
+                    expected_shp = cache_dir / "ecs.shp"
+
+                if expected_shp and expected_shp.exists():
+                    print(f"MARINEREGIONS: {layer_info['description']} shapefiles already extracted")
+                    success_count += 1
+                    continue
+
+                # Download if ZIP doesn't exist
                 if not zip_path.exists():
+                    print(f"MARINEREGIONS: Downloading {layer_info['description']}...")
                     # Add browser headers to mimic real browser request
                     headers = {
                         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
@@ -214,7 +232,8 @@ def refresh_static_caches():
 
                     print(f"MARINEREGIONS: Downloaded {layer_info['description']}, size = {zip_path.stat().st_size} bytes")
 
-                    # Extract the ZIP file
+                # Extract the ZIP file (always try to extract if shapefiles don't exist)
+                if not (expected_shp and expected_shp.exists()):
                     print(f"MARINEREGIONS: Extracting {layer_info['description']}...")
                     try:
                         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
@@ -223,11 +242,11 @@ def refresh_static_caches():
                     except zipfile.BadZipFile as zip_error:
                         print(f"MARINEREGIONS: ERROR - Downloaded file is not a valid ZIP: {zip_error}")
                         print(f"MARINEREGIONS: Deleting invalid file: {zip_path}")
-                        zip_path.unlink()
+                        if zip_path.exists():
+                            zip_path.unlink()
                         continue
-
                 else:
-                    print(f"MARINEREGIONS: {layer_info['description']} already downloaded")
+                    print(f"MARINEREGIONS: {layer_info['description']} ZIP already downloaded and extracted")
 
                 success_count += 1
 
