@@ -685,32 +685,45 @@ def safe_delete_backup(backup_dir: Path):
                 pass  # Ignore permission errors during chmod
 
     # Try deletion with increased retries and longer delays
+    interrupted = False
     for attempt in range(1, 11):  # Increased to 10 attempts
         try:
             shutil.rmtree(backup_dir)
             log_pipeline_action("BACKUP DELETE", f"Successfully deleted: {backup_dir}")
             return
         except PermissionError as e:
+            if interrupted:
+                break
             wait_time = min(3 + attempt, 8)  # Progressive delay up to 8s
             log_pipeline_action("BACKUP DELETE", f"PermissionError on attempt {attempt}/10: {e}. Retrying in {wait_time}s...")
-            time.sleep(wait_time)
+            try:
+                time.sleep(wait_time)
+            except KeyboardInterrupt:
+                log_pipeline_action("BACKUP DELETE", f"Backup deletion interrupted by user on attempt {attempt}/10")
+                interrupted = True
+                break
             # Force garbage collection again
             gc.collect()
+        except KeyboardInterrupt:
+            log_pipeline_action("BACKUP DELETE", f"Backup deletion interrupted by user on attempt {attempt}/10")
+            interrupted = True
+            break
         except Exception as e:
             log_pipeline_action("BACKUP DELETE", f"Failed to delete backup {backup_dir}: {e}")
             break
 
     # Final fallback - ignore errors and extended cleanup
-    try:
-        shutil.rmtree(backup_dir, ignore_errors=True)
-        time.sleep(2)  # Wait for ignore_errors to complete
-        if backup_dir.exists():
-            print(f"Note: Could not delete backup folder {backup_dir} - likely OneDrive/antivirus lock. Manual cleanup may be needed.")
-        else:
-            log_pipeline_action("BACKUP DELETE", f"Backup eventually deleted via ignore_errors")
-    except Exception as e:
-        print(f"Note: Final backup deletion attempt failed for {backup_dir}: {e}")
-        print("This is not critical - the pipeline will continue normally.")
+    if not interrupted:
+        try:
+            shutil.rmtree(backup_dir, ignore_errors=True)
+            time.sleep(2)  # Wait for ignore_errors to complete
+            if backup_dir.exists():
+                print(f"Note: Could not delete backup folder {backup_dir} - likely OneDrive/antivirus lock. Manual cleanup may be needed.")
+            else:
+                log_pipeline_action("BACKUP DELETE", f"Backup eventually deleted via ignore_errors")
+        except Exception as e:
+            print(f"Note: Final backup deletion attempt failed for {backup_dir}: {e}")
+            print("This is not critical - the pipeline will continue normally.")
 
 def retry_download(func, max_retries=3, backoff_factor=2):
     """Retry a download function with exponential backoff."""
@@ -786,7 +799,10 @@ def refresh_static_data():
         not cables_dir.exists()
     )
 
-    if static_age_days <= 30 and not static_changed_flag and not shapefiles_missing:
+    # TEMPORARY: Force static refresh to run to fix missing shapefiles
+    print(f"STATIC REFRESH: Forcing refresh - age {static_age_days:.1f} days, shapefiles_missing = {shapefiles_missing}")
+    # Always run static refresh for now to ensure shapefiles are downloaded
+    if False:  # Temporarily disable the skip condition
         log_pipeline_action("STATIC REFRESH", f"Skipped - age {static_age_days:.1f} days, no change flag, shapefiles exist")
         return True  # Not an error, just no refresh needed
 
