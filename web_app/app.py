@@ -303,43 +303,12 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
     print(f"PREGENERATE: Found {len(all_shp_files)} shapefiles in marineregions: {[str(f.name) for f in all_shp_files]}")
 
     if all_shp_files:
-        # Collect all unique countries from EEZ data (matching desktop approach)
-        eez_shp_files = [f for f in all_shp_files if f.match('eez*.shp')]
-        if eez_shp_files:
-            eez_shp = eez_shp_files[0]
-            print(f"PREGENERATE: Loading EEZ shapefile for countries: {eez_shp}")
-            try:
-                gdf_eez = gpd.read_file(eez_shp)
+        # Load each of the 4 shapefiles separately into their own GeoDataFrames
+        layer_gdfs = {}
+        all_countries = set()
 
-                # Clean and validate geometries (matching desktop)
-                print(f"PREGENERATE: Cleaning EEZ geometries ({len(gdf_eez)} features)")
-                gdf_eez = gdf_eez[gdf_eez.geometry.is_valid & ~gdf_eez.geometry.is_empty]
-                gdf_eez['geometry'] = gdf_eez['geometry'].make_valid().buffer(0)
-                gdf_eez = gdf_eez.to_crs('EPSG:4326')
+        print(f"PREGENERATE: Loading MarineRegions shapefiles separately...")
 
-                # Get unique countries from EEZ data
-                iso_col = 'iso_ter1' if 'iso_ter1' in gdf_eez.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf_eez.columns else None)
-                if iso_col:
-                    all_countries = gdf_eez[iso_col].unique()
-                    all_countries = [c for c in all_countries if c and not pd.isna(c)]
-                    all_countries = sorted(list(set(all_countries)))
-                    print(f"PREGENERATE: Found {len(all_countries)} countries from EEZ data (column '{iso_col}')")
-                else:
-                    print("PREGENERATE: No ISO column found in EEZ data")
-                    all_countries = []
-
-                # Clean up EEZ GeoDataFrame
-                del gdf_eez
-                gc.collect()
-
-            except Exception as e:
-                print(f"PREGENERATE: Error loading EEZ shapefile: {e}")
-                all_countries = []
-        else:
-            print("PREGENERATE: No EEZ shapefile found")
-            all_countries = []
-
-        # Process each layer type separately (matching desktop)
         for layer_key, config in layer_configs.items():
             try:
                 shp_files = [f for f in all_shp_files if f.match(config['shp_pattern']) or layer_key.lower() in str(f).lower()]
@@ -348,76 +317,235 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                     continue
 
                 shp_file = shp_files[0]
-                print(f"PREGENERATE: Processing {layer_key} from {shp_file.name}")
+                print(f"PREGENERATE: Loading {layer_key} shapefile: {shp_file.name}")
 
-                # Load the shapefile
+                # Load shapefile into GeoDataFrame
                 gdf = gpd.read_file(shp_file)
                 if gdf.empty:
                     print(f"PREGENERATE: {layer_key} shapefile is empty")
                     continue
 
-                # Clean and validate geometries (matching desktop)
-                print(f"PREGENERATE: Cleaning {layer_key} geometries ({len(gdf)} features)")
-                gdf = gdf[gdf.geometry.is_valid & ~gdf.geometry.is_empty]
-                gdf['geometry'] = gdf['geometry'].make_valid().buffer(0)
-                gdf = gdf.to_crs('EPSG:4326')
+                # Ensure EPSG:4326 early
+                if gdf.crs != 'EPSG:4326':
+                    gdf = gdf.to_crs('EPSG:4326')
 
-                # Fix problematic fields (matching desktop)
-                for col in gdf.columns:
-                    if col in ['mrgid_sov1', 'mrgid_eez', 'mrgid_ter1', 'mrgid_sov2']:
-                        gdf[col] = gdf[col].fillna(0).astype(int)
-                    elif gdf[col].dtype == 'object':
-                        gdf[col] = gdf[col].fillna('').astype(str)
+                # Store the GeoDataFrame
+                layer_gdfs[layer_key] = gdf
 
-                # Determine ISO column
+                # Collect unique countries from this layer
                 iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
-
                 if iso_col:
-                    # Process each country for this layer
-                    for country_iso in all_countries:
-                        try:
-                            country_iso_dir = country_dir / str(country_iso)
-                            country_iso_dir.mkdir(exist_ok=True)
+                    layer_countries = gdf[iso_col].unique()
+                    layer_countries = [c for c in layer_countries if c and not pd.isna(c)]
+                    all_countries.update(layer_countries)
+                    print(f"PREGENERATE: {layer_key} has {len(gdf)} features, {len(layer_countries)} countries")
 
-                            # Filter data for this country
-                            country_data = gdf[gdf[iso_col] == country_iso]
+            except Exception as e:
+                print(f"PREGENERATE: Error loading {layer_key} shapefile: {e}")
+                continue
 
-                            if not country_data.empty:
-                                # Generate temp KML with geopandas (matching desktop)
-                                temp_kml = country_iso_dir / f"{country_iso}_{config['kml_suffix']}_temp.kml"
-                                final_kml = country_iso_dir / f"{country_iso}_{config['kml_suffix']}.kml"
+        # Convert to sorted list
+        all_countries = sorted(list(all_countries))
+        print(f"PREGENERATE: Starting per-country MarineRegions processing ({len(all_countries)} countries)...")
 
-                                # Convert to KML using geopandas
-                                country_data.to_file(str(temp_kml), driver='KML')
+        # Process each country sequentially
+        import time
+        start_time = time.time()
+        processed_countries = 0
 
-                                # Apply desktop styling using process_kml
-                                color_abgr = hex_to_kml_abgr(config['color_hex'], config['opacity'])
-                                if process_kml(str(temp_kml), str(final_kml), color_abgr):
-                                    print(f"PREGENERATE: Generated {config['kml_suffix']} for {country_iso}")
+        for country_code in all_countries:
+            country_start = time.time()
+            print(f"PREGENERATE: Processing MarineRegions for {country_code}...")
+
+            country_layers = 0
+            country_combined = None
+
+            # Process each layer for this country
+            for layer_key, config in layer_configs.items():
+                if layer_key not in layer_gdfs:
+                    continue
+
+                gdf = layer_gdfs[layer_key]
+                iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
+                if not iso_col:
+                    continue
+
+                # Filter data for this country
+                country_layer = gdf[gdf[iso_col] == country_code]
+                if country_layer.empty:
+                    continue
+
+                try:
+                    # Clean only this small subset (no global make_valid().buffer(0))
+                    country_layer = country_layer[country_layer.geometry.is_valid & ~country_layer.geometry.is_empty]
+                    country_layer['geometry'] = country_layer['geometry'].make_valid()  # Keep make_valid, remove buffer(0)
+
+                    # Optional light simplify for performance
+                    if len(country_layer) > 5:  # Only for larger country datasets
+                        country_layer = country_layer.copy()
+                        country_layer['geometry'] = country_layer.geometry.simplify(0.001, preserve_topology=True)
+
+                    # Fix problematic fields (matching desktop)
+                    for col in country_layer.columns:
+                        if col in ['mrgid_sov1', 'mrgid_eez', 'mrgid_ter1', 'mrgid_sov2']:
+                            country_layer[col] = country_layer[col].fillna(0).astype(int)
+                        elif country_layer[col].dtype == 'object':
+                            country_layer[col] = country_layer[col].fillna('').astype(str)
+
+                    # Create country directory
+                    country_iso_dir = country_dir / str(country_code)
+                    country_iso_dir.mkdir(exist_ok=True)
+
+                    # Generate KML for this layer
+                    temp_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}_temp.kml"
+                    final_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}.kml"
+
+                    # Convert to KML using geopandas
+                    country_layer.to_file(str(temp_kml), driver='KML')
+
+                    # Apply desktop styling using process_kml
+                    color_abgr = hex_to_kml_abgr(config['color_hex'], config['opacity'])
+                    if process_kml(str(temp_kml), str(final_kml), color_abgr):
+                        country_layers += 1
+                        # Clean up temp file
+                        if temp_kml.exists():
+                            temp_kml.unlink()
+                    else:
+                        print(f"PREGENERATE: Failed to style {config['kml_suffix']} for {country_code}")
+                        # Clean up temp file on failure
+                        if temp_kml.exists():
+                            temp_kml.unlink()
+
+                except Exception as layer_error:
+                    print(f"PREGENERATE: Error processing {layer_key} for {country_code}: {layer_error}")
+                    continue
+
+            # Report completion for this country
+            country_elapsed = time.time() - country_start
+            processed_countries += 1
+            print(f"PREGENERATE: Completed {country_code} ({country_layers} layers) in {country_elapsed:.1f}s")
+
+        # Clean up layer GeoDataFrames
+        for gdf in layer_gdfs.values():
+            del gdf
+        layer_gdfs.clear()
+        gc.collect()
+
+        total_elapsed = time.time() - start_time
+        print(f"PREGENERATE: MarineRegions processing complete - {processed_countries}/{len(all_countries)} countries processed in {total_elapsed:.1f}s")
+
+        # Skip the old layer-by-layer processing since we did per-country above
+        return
+
+    # Process WDPA data for MPAs
+    wdpa_dir = STATIC_CACHE_DIR / "wdpa"
+    wdpa_files = list(wdpa_dir.glob("*.zip"))
+    if wdpa_files:
+        wdpa_file = wdpa_files[0]
+        print(f"PREGENERATE: Processing MPA data from {wdpa_file}")
+        mpa_gdf = None
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                print(f"PREGENERATE: Extracting WDPA ZIP to {temp_dir}")
+                with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
+                    zip_ref.extractall(temp_dir)
+
+                # Check for direct shapefiles
+                shp_files = list(Path(temp_dir).glob("*.shp"))
+                if not shp_files:
+                    # Prefer polygons shapefile over points
+                    polygons_shp = None
+                    for shp_file in shp_files:
+                        if 'polygons' in str(shp_file).lower():
+                            polygons_shp = shp_file
+                            break
+                    if not polygons_shp:
+                        polygons_shp = shp_files[0]  # fallback to first one
+
+                    print(f"PREGENERATE: Reading shapefile {polygons_shp}")
+                    mpa_gdf = gpd.read_file(polygons_shp)
+                    print(f"PREGENERATE: Loaded {len(mpa_gdf)} MPA features")
+                    print(f"PREGENERATE: MPA columns: {list(mpa_gdf.columns)}")
+                else:
+                    print("PREGENERATE: No shapefiles found in extracted ZIP")
+
+            # Generate country-specific MPA KMLs
+            if mpa_gdf is not None and any(col.lower() == 'iso3' for col in mpa_gdf.columns):
+                # Find the correct column name (case-insensitive)
+                iso3_col = next(col for col in mpa_gdf.columns if col.lower() == 'iso3')
+
+                mpa_countries = mpa_gdf[iso3_col].unique()
+                mpa_countries = [c for c in mpa_countries if c and not pd.isna(c)]
+                print(f"PREGENERATE: Found {len(mpa_countries)} countries with MPA data (using column '{iso3_col}')")
+
+                success_count = 0
+                for country_iso in mpa_countries:
+                    try:
+                        country_iso_dir = country_dir / str(country_iso)
+                        country_iso_dir.mkdir(exist_ok=True)
+
+                        country_mpa = mpa_gdf[mpa_gdf[iso3_col] == country_iso]
+                        if not country_mpa.empty:
+                            mpa_kml = country_iso_dir / f"{country_iso}_MPA.kml"
+                            temp_kml = country_iso_dir / f"{country_iso}_MPA_temp.kml"
+
+                            # Clean MPA data
+                            country_mpa = country_mpa[country_mpa.geometry.is_valid & ~country_mpa.geometry.is_empty]
+
+                            # Reduce columns to only essential ones for smaller/faster KML
+                            keep_columns = ['NAME_ENG', 'DESIG_ENG', 'IUCN_CAT', 'STATUS', 'STATUS_YR', 'geometry']
+                            available_columns = [col for col in keep_columns if col in country_mpa.columns]
+                            if available_columns:
+                                country_mpa = country_mpa[available_columns]
+
+                            # Add geometry simplification for smaller/faster files (0.005 degrees ~ 500m at equator)
+                            if len(country_mpa) > 10:  # Only simplify for larger datasets
+                                country_mpa = country_mpa.copy()
+                                country_mpa['geometry'] = country_mpa.geometry.simplify(0.005, preserve_topology=True)
+
+                            # Skip geometry simplification to avoid KeyboardInterrupt - keep original geometries
+                            import time
+                            start_time = time.time()
+
+                            try:
+                                # Create basic KML first (use default geopandas KML driver - no engine parameter)
+                                country_mpa.to_file(str(temp_kml), driver='KML')
+
+                                # Apply desktop MPA styling (red fill)
+                                mpa_color_abgr = "ff0000ff"  # Red with full opacity
+                                if process_kml(str(temp_kml), str(mpa_kml), mpa_color_abgr):
+                                    elapsed = time.time() - start_time
+                                    print(f"PREGENERATE: Generated MPA for {country_iso} ({len(country_mpa)} features) in {elapsed:.1f}s")
+                                    success_count += 1
                                 else:
-                                    print(f"PREGENERATE: Failed to style {config['kml_suffix']} for {country_iso}")
+                                    print(f"PREGENERATE: Failed to style MPA for {country_iso}")
 
                                 # Clean up temp file
                                 if temp_kml.exists():
                                     temp_kml.unlink()
-                            else:
-                                print(f"PREGENERATE: No {layer_key} data for {country_iso}")
 
-                        except Exception as country_error:
-                            print(f"PREGENERATE: Error processing {layer_key} for country {country_iso}: {country_error}")
-                            continue
+                            except Exception as kml_error:
+                                elapsed = time.time() - start_time
+                                print(f"PREGENERATE: Failed to generate MPA KML for {country_iso} after {elapsed:.1f}s: {kml_error}")
+                    except Exception as country_error:
+                        print(f"PREGENERATE: Error processing MPA country {country_iso}: {country_error}")
+                        continue
 
-                # Clean up GeoDataFrame
-                del gdf
-                gc.collect()
+                print(f"PREGENERATE: MPA processing complete - {success_count}/{len(mpa_countries)} countries succeeded")
+            else:
+                print("PREGENERATE: MPA data not loaded or missing iso3 column")
 
-            except Exception as layer_error:
-                print(f"PREGENERATE: Error processing {layer_key}: {layer_error}")
-                continue
+            # Clean up MPA GeoDataFrame and force garbage collection
+            if 'mpa_gdf' in locals() and mpa_gdf is not None:
+                del mpa_gdf
+            gc.collect()
 
-        print(f"PREGENERATE: MarineRegions processing complete - processed {len(all_countries)} countries")
-    else:
-        print("PREGENERATE: No MarineRegions shapefiles found")
+        except Exception as e:
+            print(f"PREGENERATE: Error processing MPA data: {e}")
+            # Clean up on error too
+            if 'mpa_gdf' in locals() and mpa_gdf is not None:
+                del mpa_gdf
+            gc.collect()
 
     # Process WDPA data for MPAs
     wdpa_dir = STATIC_CACHE_DIR / "wdpa"
