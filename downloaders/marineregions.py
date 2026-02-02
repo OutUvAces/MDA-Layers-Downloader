@@ -185,20 +185,47 @@ def refresh_static_caches():
                 zip_path = cache_dir / layer_info['zip_name']
 
                 if not zip_path.exists():
-                    response = requests.get(layer_info['url'], timeout=120, verify=False)
+                    # Add browser headers to mimic real browser request
+                    headers = {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                        'Accept-Language': 'en-US,en;q=0.5',
+                        'Accept-Encoding': 'gzip, deflate',
+                        'Connection': 'keep-alive',
+                        'Referer': 'https://www.marineregions.org/',
+                    }
+
+                    response = requests.get(layer_info['url'], timeout=120, verify=False, headers=headers)
                     response.raise_for_status()
 
+                    content = response.content
+
+                    # Debug: Check if we got HTML instead of ZIP
+                    content_start = content[:200].decode('utf-8', errors='ignore')
+                    if '<html' in content_start.lower() or '<!doctype html' in content_start.lower():
+                        print(f"MARINEREGIONS: ERROR - Received HTML page instead of ZIP for {layer_info['description']}")
+                        print(f"MARINEREGIONS: Content preview: {content_start[:200]}...")
+                        print(f"MARINEREGIONS: This likely means the download requires acceptance/login/CAPTCHA")
+                        print(f"MARINEREGIONS: Skipping {layer_info['description']} - no shapefile data available")
+                        continue
+
                     with open(zip_path, 'wb') as f:
-                        f.write(response.content)
+                        f.write(content)
 
                     print(f"MARINEREGIONS: Downloaded {layer_info['description']}, size = {zip_path.stat().st_size} bytes")
 
                     # Extract the ZIP file
                     print(f"MARINEREGIONS: Extracting {layer_info['description']}...")
-                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                        zip_ref.extractall(cache_dir)
+                    try:
+                        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                            zip_ref.extractall(cache_dir)
+                        print(f"MARINEREGIONS: {layer_info['description']} extracted")
+                    except zipfile.BadZipFile as zip_error:
+                        print(f"MARINEREGIONS: ERROR - Downloaded file is not a valid ZIP: {zip_error}")
+                        print(f"MARINEREGIONS: Deleting invalid file: {zip_path}")
+                        zip_path.unlink()
+                        continue
 
-                    print(f"MARINEREGIONS: {layer_info['description']} extracted")
                 else:
                     print(f"MARINEREGIONS: {layer_info['description']} already downloaded")
 

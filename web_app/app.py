@@ -486,14 +486,29 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                             # Clean MPA data
                             country_mpa = country_mpa[country_mpa.geometry.is_valid & ~country_mpa.geometry.is_empty]
 
+                            # Reduce columns to only essential ones for smaller/faster KML
+                            keep_columns = ['NAME', 'DESIG_ENG', 'IUCN_CAT', 'STATUS', 'STATUS_YR', 'geometry']
+                            available_columns = [col for col in keep_columns if col in country_mpa.columns]
+                            if available_columns:
+                                country_mpa = country_mpa[available_columns]
+
+                            # Add geometry simplification to make files smaller/faster
+                            import time
+                            start_time = time.time()
+
                             try:
-                                # Create basic KML first
-                                country_mpa.to_file(str(temp_kml), driver='KML')
+                                # Simplify geometries (0.002 degrees ~ 200m at equator)
+                                country_mpa_copy = country_mpa.copy()
+                                country_mpa_copy['geometry'] = country_mpa_copy.geometry.simplify(0.002, preserve_topology=True)
+
+                                # Create basic KML first (try fiona driver instead of pyogrio for better performance)
+                                country_mpa_copy.to_file(str(temp_kml), driver='KML', engine='fiona')
 
                                 # Apply desktop MPA styling (red fill)
                                 mpa_color_abgr = "ff0000ff"  # Red with full opacity
                                 if process_kml(str(temp_kml), str(mpa_kml), mpa_color_abgr):
-                                    print(f"PREGENERATE: Generated MPA for {country_iso} ({len(country_mpa)} features)")
+                                    elapsed = time.time() - start_time
+                                    print(f"PREGENERATE: Generated MPA for {country_iso} ({len(country_mpa)} features) in {elapsed:.1f}s")
                                     success_count += 1
                                 else:
                                     print(f"PREGENERATE: Failed to style MPA for {country_iso}")
@@ -503,7 +518,8 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                                     temp_kml.unlink()
 
                             except Exception as kml_error:
-                                print(f"PREGENERATE: Failed to generate MPA KML for {country_iso}: {kml_error}")
+                                elapsed = time.time() - start_time
+                                print(f"PREGENERATE: Failed to generate MPA KML for {country_iso} after {elapsed:.1f}s: {kml_error}")
                     except Exception as country_error:
                         print(f"PREGENERATE: Error processing MPA country {country_iso}: {country_error}")
                         continue
@@ -693,11 +709,12 @@ def safe_delete_backup(backup_dir: Path):
         shutil.rmtree(backup_dir, ignore_errors=True)
         time.sleep(2)  # Wait for ignore_errors to complete
         if backup_dir.exists():
-            log_pipeline_action("BACKUP DELETE", f"Could not delete backup {backup_dir} after retries - manual cleanup needed: {backup_dir}")
+            print(f"Note: Could not delete backup folder {backup_dir} - likely OneDrive/antivirus lock. Manual cleanup may be needed.")
         else:
             log_pipeline_action("BACKUP DELETE", f"Backup eventually deleted via ignore_errors")
     except Exception as e:
-        log_pipeline_action("BACKUP DELETE", f"Final deletion attempt failed: {e}")
+        print(f"Note: Final backup deletion attempt failed for {backup_dir}: {e}")
+        print("This is not critical - the pipeline will continue normally.")
 
 def retry_download(func, max_retries=3, backoff_factor=2):
     """Retry a download function with exponential backoff."""
