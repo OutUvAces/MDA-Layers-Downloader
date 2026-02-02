@@ -487,10 +487,15 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                             country_mpa = country_mpa[country_mpa.geometry.is_valid & ~country_mpa.geometry.is_empty]
 
                             # Reduce columns to only essential ones for smaller/faster KML
-                            keep_columns = ['NAME', 'DESIG_ENG', 'IUCN_CAT', 'STATUS', 'STATUS_YR', 'geometry']
+                            keep_columns = ['NAME_ENG', 'DESIG_ENG', 'IUCN_CAT', 'STATUS', 'STATUS_YR', 'geometry']
                             available_columns = [col for col in keep_columns if col in country_mpa.columns]
                             if available_columns:
                                 country_mpa = country_mpa[available_columns]
+
+                            # Add geometry simplification for smaller/faster files (0.005 degrees ~ 500m at equator)
+                            if len(country_mpa) > 10:  # Only simplify for larger datasets
+                                country_mpa = country_mpa.copy()
+                                country_mpa['geometry'] = country_mpa.geometry.simplify(0.005, preserve_topology=True)
 
                             # Skip geometry simplification to avoid KeyboardInterrupt - keep original geometries
                             import time
@@ -799,10 +804,7 @@ def refresh_static_data():
         not cables_dir.exists()
     )
 
-    # TEMPORARY: Force static refresh to run to fix missing shapefiles
-    print(f"STATIC REFRESH: Forcing refresh - age {static_age_days:.1f} days, shapefiles_missing = {shapefiles_missing}")
-    # Always run static refresh for now to ensure shapefiles are downloaded
-    if False:  # Temporarily disable the skip condition
+    if static_age_days <= 30 and not static_changed_flag and not shapefiles_missing:
         log_pipeline_action("STATIC REFRESH", f"Skipped - age {static_age_days:.1f} days, no change flag, shapefiles exist")
         return True  # Not an error, just no refresh needed
 
@@ -924,10 +926,10 @@ def refresh_dynamic_data():
         return False
 
     if download_success:
-        # Always regenerate global KMLs for dynamic data (sub_cables and NAVWARN)
+        # Regenerate only dynamic KMLs (nav warnings) - don't force static MPA regeneration
         try:
-            # Force regeneration for dynamic data
-            pregenerate_default_kmls(force_regeneration=True, changed_layers=None)
+            # Only regenerate dynamic layers, not static ones
+            pregenerate_default_kmls(force_regeneration=False, changed_layers=['nav_warnings'])
             log_pipeline_action("DYNAMIC REFRESH", "KML regeneration completed")
         except Exception as e:
             log_pipeline_action("DYNAMIC REFRESH", f"KML regeneration failed: {e}")

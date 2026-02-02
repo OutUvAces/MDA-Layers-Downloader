@@ -153,25 +153,25 @@ def refresh_static_caches():
         import zipfile
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-        # Define the MarineRegions layers to download (matching desktop)
+        # Define the MarineRegions layers to download using GeoServer WFS (working URLs)
         layers = {
             'eez': {
-                'url': "https://www.marineregions.org/download_file.php?fn=v12_20231025_eez",
+                'url': "https://geo.vliz.be/geoserver/MarineRegions/wfs?service=WFS&version=1.0.0&request=GetFeature&typeName=eez&outputFormat=SHAPE-ZIP",
                 'zip_name': "eez.zip",
                 'description': "Exclusive Economic Zones"
             },
             'territorial_seas': {
-                'url': "https://www.marineregions.org/download_file.php?fn=v4_20231025_territorial_seas",
+                'url': "https://geo.vliz.be/geoserver/MarineRegions/wfs?service=WFS&version=1.0.0&request=GetFeature&typeName=eez_12nm&outputFormat=SHAPE-ZIP",
                 'zip_name': "territorial_seas.zip",
                 'description': "Territorial Seas"
             },
             'contiguous_zones': {
-                'url': "https://www.marineregions.org/download_file.php?fn=v4_20231025_contiguous_zones",
+                'url': "https://geo.vliz.be/geoserver/MarineRegions/wfs?service=WFS&version=1.0.0&request=GetFeature&typeName=eez_24nm&outputFormat=SHAPE-ZIP",
                 'zip_name': "contiguous_zones.zip",
                 'description': "Contiguous Zones"
             },
             'ecs': {
-                'url': "https://www.marineregions.org/download_file.php?fn=v2_20231025_ecs",
+                'url': "https://geo.vliz.be/geoserver/MarineRegions/wfs?service=WFS&version=1.0.0&request=GetFeature&typeName=ecs&outputFormat=SHAPE-ZIP",
                 'zip_name': "ecs.zip",
                 'description': "Extended Continental Shelf"
             }
@@ -205,11 +205,8 @@ def refresh_static_caches():
                     print(f"MARINEREGIONS: Downloading {layer_info['description']}...")
                     # Add browser headers to mimic real browser request
                     headers = {
-                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                        'Accept-Language': 'en-US,en;q=0.5',
-                        'Accept-Encoding': 'gzip, deflate',
-                        'Connection': 'keep-alive',
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                        'Accept': '*/*',
                         'Referer': 'https://www.marineregions.org/',
                     }
 
@@ -229,6 +226,14 @@ def refresh_static_caches():
 
                     with open(zip_path, 'wb') as f:
                         f.write(content)
+
+                    # Validate that we actually downloaded a ZIP file
+                    if not content.startswith(b'PK\x03\x04'):
+                        print(f"MARINEREGIONS: ERROR - Downloaded file is not a ZIP (starts with {content[:20]})")
+                        print(f"MARINEREGIONS: This likely means the download requires acceptance/login/CAPTCHA")
+                        print(f"MARINEREGIONS: Skipping {layer_info['description']} - no shapefile data available")
+                        zip_path.unlink()
+                        continue
 
                     print(f"MARINEREGIONS: Downloaded {layer_info['description']}, size = {zip_path.stat().st_size} bytes")
 
