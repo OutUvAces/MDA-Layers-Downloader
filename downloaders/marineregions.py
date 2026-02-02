@@ -140,6 +140,81 @@ async def process_async(session, task: LayerTask, report_progress, output_dir: s
                 pass
 
 def refresh_static_caches():
-    """Refresh static caches - MarineRegions uses direct KML downloads, no shapefile caching needed"""
-    print("MARINEREGIONS: Static caches not needed - using direct KML downloads")
-    return True
+    """Refresh all static caches for MarineRegions data using separate shapefile downloads (matching desktop)"""
+    print("MARINEREGIONS: Refreshing static caches...")
+
+    try:
+        cache_dir = Path(__file__).parent.parent / "cache" / "raw_source_data" / "static" / "marineregions"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+
+        # Force disable SSL verification for MarineRegions (as in desktop)
+        import urllib3
+        import requests
+        import zipfile
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+        # Define the MarineRegions layers to download (matching desktop)
+        layers = {
+            'eez': {
+                'url': "https://www.marineregions.org/download_file.php?fn=v12_20231025_eez",
+                'zip_name': "eez.zip",
+                'description': "Exclusive Economic Zones"
+            },
+            'territorial_seas': {
+                'url': "https://www.marineregions.org/download_file.php?fn=v4_20231025_territorial_seas",
+                'zip_name': "territorial_seas.zip",
+                'description': "Territorial Seas"
+            },
+            'contiguous_zones': {
+                'url': "https://www.marineregions.org/download_file.php?fn=v4_20231025_contiguous_zones",
+                'zip_name': "contiguous_zones.zip",
+                'description': "Contiguous Zones"
+            },
+            'ecs': {
+                'url': "https://www.marineregions.org/download_file.php?fn=v2_20231025_ecs",
+                'zip_name': "ecs.zip",
+                'description': "Extended Continental Shelf"
+            }
+        }
+
+        success_count = 0
+
+        for layer_key, layer_info in layers.items():
+            try:
+                print(f"MARINEREGIONS: Downloading {layer_info['description']}...")
+                zip_path = cache_dir / layer_info['zip_name']
+
+                if not zip_path.exists():
+                    response = requests.get(layer_info['url'], timeout=120, verify=False)
+                    response.raise_for_status()
+
+                    with open(zip_path, 'wb') as f:
+                        f.write(response.content)
+
+                    print(f"MARINEREGIONS: Downloaded {layer_info['description']}, size = {zip_path.stat().st_size} bytes")
+
+                    # Extract the ZIP file
+                    print(f"MARINEREGIONS: Extracting {layer_info['description']}...")
+                    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                        zip_ref.extractall(cache_dir)
+
+                    print(f"MARINEREGIONS: {layer_info['description']} extracted")
+                else:
+                    print(f"MARINEREGIONS: {layer_info['description']} already downloaded")
+
+                success_count += 1
+
+            except Exception as layer_error:
+                print(f"MARINEREGIONS: Failed to download/extract {layer_info['description']}: {layer_error}")
+                continue
+
+        if success_count > 0:
+            print(f"MARINEREGIONS: Static caches refreshed - {success_count}/{len(layers)} layers successful")
+            return True
+        else:
+            print("MARINEREGIONS: No layers were successfully downloaded")
+            return False
+
+    except Exception as e:
+        print(f"MARINEREGIONS: Static cache refresh failed: {e}")
+        return False
