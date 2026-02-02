@@ -934,6 +934,10 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(refresh_caches, 'interval', hours=12, id='cache_refresh')
 scheduler.start()
 
+# Force initial cache refresh on startup
+print("APP STARTUP: Checking cache status...")
+refresh_caches()
+
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS

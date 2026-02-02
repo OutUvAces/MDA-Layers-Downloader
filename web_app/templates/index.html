@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}MDA Layers Downloader - Marine Data Portal{% endblock %}
+{% block title %}MDA Layers Downloader{% endblock %}
 
 {% block content %}
 <div class="row">
@@ -59,16 +59,14 @@
                         </div>
                     </div>
 
-                <!-- Reset to Defaults Button -->
-                <div class="text-end mb-3">
-                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetStylingToDefaults()" id="reset_button">
-                        <i class="fas fa-undo"></i> Reset to Defaults
-                    </button>
-                </div>
-
                 <!-- Country-Specific Layers Section -->
                 <div class="layer-card">
-                    <h5 class="mb-3"><i class="fas fa-flag"></i> Country-Specific Layers</h5>
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0"><i class="fas fa-flag"></i> Country-Specific Layers</h5>
+                        <button type="button" class="btn btn-outline-secondary btn-sm" onclick="resetStylingToDefaults()" id="reset_button">
+                            <i class="fas fa-undo"></i> Reset to Defaults
+                        </button>
+                    </div>
 
                     <!-- EEZ -->
                     <div class="row mb-2 align-items-center">
@@ -217,7 +215,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://www.protectedplanet.net/en/thematic-areas/marine-protected-areas" target="_blank" class="text-decoration-none">
-                                    <a href="https://www.protectedplanet.net/en/thematic-areas/marine-protected-areas" target="_blank" class="text-decoration-none">Protected Planet (WDPA)</a>
+                                    <a href="https://www.protectedplanet.net/" target="_blank" class="text-decoration-none">Protected Planet</a>
                                 </a>
                             </small>
                         </div>
@@ -251,7 +249,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://podaac.jpl.nasa.gov/dataset/OSCAR_L4_OC_NRT_V2.0" target="_blank" class="text-decoration-none">
-                                    <a href="https://podaac.jpl.nasa.gov/dataset/OSCAR_L4_OC_NRT_V2.0" target="_blank" class="text-decoration-none">NASA OSCAR NRT</a>
+                                    <a href="https://podaac.jpl.nasa.gov/" target="_blank" class="text-decoration-none">NASA</a>
                                 </a>
                             </small>
                         </div>
@@ -295,7 +293,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://podaac.jpl.nasa.gov/dataset/OSCAR_L4_OC_NRT_V2.0" target="_blank" class="text-decoration-none">
-                                    <a href="https://podaac.jpl.nasa.gov/dataset/OSCAR_L4_OC_NRT_V2.0" target="_blank" class="text-decoration-none">NASA OSCAR NRT</a>
+                                    <a href="https://podaac.jpl.nasa.gov/" target="_blank" class="text-decoration-none">NASA</a>
                                 </a>
                             </small>
                         </div>
@@ -334,7 +332,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://msi.nga.mil/NavWarnings" target="_blank" class="text-decoration-none">
-                                    <a href="https://msi.nga.mil/NavWarnings" target="_blank" class="text-decoration-none">NGA MSI</a>
+                                    <a href="https://msi.nga.mil/" target="_blank" class="text-decoration-none">NGA MSI</a>
                                 </a>
                             </small>
                         </div>
@@ -374,7 +372,7 @@
                             </div>
                             <small class="text-muted ms-3">
                                 <a href="https://www.submarinecablemap.com/" target="_blank" class="text-decoration-none">
-                                    <a href="https://www.submarinecablemap.com/" target="_blank" class="text-decoration-none">SubmarineCableMap</a>
+                                    <a href="https://www.submarinecablemap.com/" target="_blank" class="text-decoration-none">TeleGeography</a>
                                 </a>
                             </small>
                         </div>
