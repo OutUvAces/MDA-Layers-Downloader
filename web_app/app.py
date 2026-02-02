@@ -232,10 +232,13 @@ def get_cache_age(last_refresh, unit='hours'):
         return float('inf')
 
 def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
-    """Pre-generate default-style KMLs for static layers"""
+    """Pre-generate default-style KMLs for static layers using desktop processing logic"""
     import geopandas as gpd
     import zipfile
+    import xml.etree.ElementTree as ET
     from shapely import wkt
+    from processing.kml_style import process_kml, process_line_kml
+    from core.utils import hex_to_kml_abgr
 
     country_dir = PREGENERATED_DIR / "country"
     global_dir = PREGENERATED_DIR / "global"
@@ -276,47 +279,89 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
         try:
             gdf = gpd.read_file(eez_shp)
 
-            # Get unique countries from EEZ data
-            if 'iso_ter1' in gdf.columns:
-                countries = gdf['iso_ter1'].unique()
-                print(f"PREGENERATE: Found {len(countries)} countries in EEZ data")
+            # Clean data to prevent OGR translation errors
+            print(f"PREGENERATE: Cleaning EEZ data ({len(gdf)} features)")
+            gdf = gdf[gdf.geometry.is_valid & ~gdf.geometry.is_empty]
 
-                for country_iso in countries[:10]:  # Limit to first 10 for demo
-                    if pd.isna(country_iso) or not country_iso:
+            # Fix problematic fields that cause OGR errors
+            for col in gdf.columns:
+                if col in ['mrgid_sov1', 'mrgid_eez', 'mrgid_ter1', 'mrgid_sov2']:
+                    gdf[col] = gdf[col].fillna(0).astype(int)
+                elif gdf[col].dtype == 'object':
+                    # Convert problematic string fields
+                    gdf[col] = gdf[col].fillna('').astype(str)
+
+            # Get unique countries from EEZ data
+            iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
+            if iso_col:
+                countries = gdf[iso_col].unique()
+                countries = [c for c in countries if c and not pd.isna(c)]
+                print(f"PREGENERATE: Found {len(countries)} countries in EEZ data (using column '{iso_col}')")
+
+                success_count = 0
+                for country_iso in countries:
+                    try:
+                        country_iso_dir = country_dir / str(country_iso)
+                        country_iso_dir.mkdir(exist_ok=True)
+
+                        # Generate country-specific KMLs
+                        country_data = gdf[gdf[iso_col] == country_iso]
+
+                        if not country_data.empty:
+                            # EEZ - use desktop processing logic
+                            temp_kml = country_iso_dir / f"{country_iso}_EEZ_temp.kml"
+                            eez_kml = country_iso_dir / f"{country_iso}_EEZ.kml"
+
+                            # Create basic KML first
+                            country_data.to_file(str(temp_kml), driver='KML')
+
+                            # Apply desktop styling (default yellow fill for EEZ)
+                            default_color_abgr = "ff00ffff"  # Yellow with full opacity
+                            if process_kml(str(temp_kml), str(eez_kml), default_color_abgr):
+                                print(f"PREGENERATE: Generated EEZ for {country_iso}")
+                                success_count += 1
+                            else:
+                                print(f"PREGENERATE: Failed to style EEZ for {country_iso}")
+
+                            # Clean up temp file
+                            if temp_kml.exists():
+                                temp_kml.unlink()
+
+                            # Territorial waters (simplified - copy EEZ for now)
+                            territorial_kml = country_iso_dir / f"{country_iso}_TTW.kml"
+                            if eez_kml.exists():
+                                import shutil
+                                shutil.copy2(eez_kml, territorial_kml)
+                                print(f"PREGENERATE: Generated TTW for {country_iso} (copied from EEZ)")
+
+                            # Contiguous zone (copy EEZ)
+                            contiguous_kml = country_iso_dir / f"{country_iso}_Contig.kml"
+                            if eez_kml.exists():
+                                shutil.copy2(eez_kml, contiguous_kml)
+                                print(f"PREGENERATE: Generated Contig for {country_iso} (copied from EEZ)")
+
+                            # ECS (copy EEZ)
+                            ecs_kml = country_iso_dir / f"{country_iso}_ECS.kml"
+                            if eez_kml.exists():
+                                shutil.copy2(eez_kml, ecs_kml)
+                                print(f"PREGENERATE: Generated ECS for {country_iso} (copied from EEZ)")
+
+                    except Exception as country_error:
+                        print(f"PREGENERATE: Error processing country {country_iso}: {country_error}")
                         continue
 
-                    country_iso_dir = country_dir / str(country_iso)
-                    country_iso_dir.mkdir(exist_ok=True)
-
-                    # Generate country-specific KMLs
-                    country_data = gdf[gdf['iso_ter1'] == country_iso]
-
-                    if not country_data.empty:
-                        # EEZ
-                        eez_kml = country_iso_dir / f"{country_iso}_EEZ.kml"
-                        country_data.to_file(eez_kml, driver='KML')
-                        print(f"PREGENERATE: Generated {eez_kml}")
-
-                        # Territorial waters (simplified - would need 12nm buffer logic)
-                        # For demo, just copy EEZ
-                        territorial_kml = country_iso_dir / f"{country_iso}_TTW.kml"
-                        country_data.to_file(territorial_kml, driver='KML')
-                        print(f"PREGENERATE: Generated {territorial_kml}")
-
-                        # Similar for contiguous and ECS
-                        contiguous_kml = country_iso_dir / f"{country_iso}_Contig.kml"
-                        country_data.to_file(contiguous_kml, driver='KML')
-
-                        ecs_kml = country_iso_dir / f"{country_iso}_ECS.kml"
-                        country_data.to_file(ecs_kml, driver='KML')
+                print(f"PREGENERATE: EEZ processing complete - {success_count}/{len(countries)} countries succeeded")
 
         except Exception as e:
             print(f"PREGENERATE: Error processing EEZ data: {e}")
 
-        # Clean up EEZ GeoDataFrame and force garbage collection
+            # Clean up EEZ GeoDataFrame and force garbage collection
         if 'gdf' in locals():
             del gdf
         gc.collect()
+
+    else:
+        print("PREGENERATE: No EEZ shapefiles found")
 
     # Process WDPA data for MPAs
     wdpa_dir = STATIC_CACHE_DIR / "wdpa"
@@ -368,23 +413,46 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                 iso3_col = next(col for col in mpa_gdf.columns if col.lower() == 'iso3')
 
                 mpa_countries = mpa_gdf[iso3_col].unique()
+                mpa_countries = [c for c in mpa_countries if c and not pd.isna(c)]
                 print(f"PREGENERATE: Found {len(mpa_countries)} countries with MPA data (using column '{iso3_col}')")
-                for country_iso in mpa_countries[:10]:  # Limit for demo
-                    if pd.isna(country_iso) or not country_iso:
+
+                success_count = 0
+                for country_iso in mpa_countries:
+                    try:
+                        country_iso_dir = country_dir / str(country_iso)
+                        country_iso_dir.mkdir(exist_ok=True)
+
+                        country_mpa = mpa_gdf[mpa_gdf[iso3_col] == country_iso]
+                        if not country_mpa.empty:
+                            mpa_kml = country_iso_dir / f"{country_iso}_MPA.kml"
+                            temp_kml = country_iso_dir / f"{country_iso}_MPA_temp.kml"
+
+                            # Clean MPA data
+                            country_mpa = country_mpa[country_mpa.geometry.is_valid & ~country_mpa.geometry.is_empty]
+
+                            try:
+                                # Create basic KML first
+                                country_mpa.to_file(str(temp_kml), driver='KML')
+
+                                # Apply desktop MPA styling (red fill)
+                                mpa_color_abgr = "ff0000ff"  # Red with full opacity
+                                if process_kml(str(temp_kml), str(mpa_kml), mpa_color_abgr):
+                                    print(f"PREGENERATE: Generated MPA for {country_iso} ({len(country_mpa)} features)")
+                                    success_count += 1
+                                else:
+                                    print(f"PREGENERATE: Failed to style MPA for {country_iso}")
+
+                                # Clean up temp file
+                                if temp_kml.exists():
+                                    temp_kml.unlink()
+
+                            except Exception as kml_error:
+                                print(f"PREGENERATE: Failed to generate MPA KML for {country_iso}: {kml_error}")
+                    except Exception as country_error:
+                        print(f"PREGENERATE: Error processing MPA country {country_iso}: {country_error}")
                         continue
 
-                    country_iso_dir = country_dir / str(country_iso)
-                    country_iso_dir.mkdir(exist_ok=True)
-
-                    country_mpa = mpa_gdf[mpa_gdf[iso3_col] == country_iso]
-                    print(f"PREGENERATE: Country {country_iso}: {len(country_mpa)} MPA features")
-                    if not country_mpa.empty:
-                        mpa_kml = country_iso_dir / f"{country_iso}_MPA.kml"
-                        try:
-                            country_mpa.to_file(mpa_kml, driver='KML')
-                            print(f"PREGENERATE: Generated {mpa_kml}")
-                        except Exception as kml_error:
-                            print(f"PREGENERATE: Failed to generate {mpa_kml}: {kml_error}")
+                print(f"PREGENERATE: MPA processing complete - {success_count}/{len(mpa_countries)} countries succeeded")
             else:
                 print("PREGENERATE: MPA data not loaded or missing iso3 column")
 
@@ -400,73 +468,22 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                 del mpa_gdf
             gc.collect()
 
-    # Process cables (global)
+    # Process cables (global) - use desktop process_line_kml for proper styling
     cables_files = list(STATIC_CACHE_DIR.glob("cables_global.*"))
     if cables_files:
         cables_file = cables_files[0]
         print(f"PREGENERATE: Processing cables data from {cables_file}")
         try:
-            # Try to load and fix the GeoJSON if needed
-            import json
-            with open(cables_file, 'r', encoding='utf-8') as f:
-                cables_data = json.load(f)
+            cables_kml = global_dir / "sub_cables.kml"
 
-            # Fix potential duplicate IDs by adding unique IDs and ensuring no duplicates
-            seen_ids = set()
-            for i, feature in enumerate(cables_data.get('features', [])):
-                # Get original ID, handling various possible formats
-                original_id = feature.get('id')
-                if original_id is None or original_id == '':
-                    # Try to get name or other identifier
-                    properties = feature.get('properties', {})
-                    original_id = properties.get('name') or properties.get('Name') or properties.get('NAME') or f"cable_{i}"
+            # Use desktop process_line_kml with random colors (handles duplicates automatically)
+            default_color_hex = "#ffffff"  # White cables
+            default_opacity = "50"
 
-                # Clean the ID to make it safe
-                original_id = str(original_id).replace(' ', '_').replace('-', '_').replace('/', '_')
-
-                # Ensure unique ID
-                unique_id = original_id
-                counter = 1
-                while unique_id in seen_ids:
-                    unique_id = f"{original_id}_{counter}"
-                    counter += 1
-                feature['id'] = unique_id
-                seen_ids.add(unique_id)
-
-            # Save fixed version
-            fixed_cables_file = cables_file.parent / "cables_global_fixed.geojson"
-            with open(fixed_cables_file, 'w', encoding='utf-8') as f:
-                json.dump(cables_data, f, indent=2)
-
-            cables_gdf = gpd.read_file(fixed_cables_file)
-            print(f"PREGENERATE: Loaded {len(cables_gdf)} cable features with unique IDs")
-
-            if not cables_gdf.empty:
-                cables_kml = global_dir / "sub_cables.kml"
-                try:
-                    cables_gdf.to_file(cables_kml, driver='KML')
-                    print(f"PREGENERATE: Generated {cables_kml}")
-                except Exception as kml_error:
-                    print(f"PREGENERATE: KML generation failed: {kml_error}")
-                    # Try alternative approach - simplekml
-                    try:
-                        import simplekml
-                        kml = simplekml.Kml()
-                        for idx, row in cables_gdf.iterrows():
-                            geom = row.geometry
-                            if hasattr(geom, 'coords'):
-                                coords = list(geom.coords)
-                                if len(coords) >= 2:
-                                    line = kml.newlinestring(name=f"Cable_{idx}")
-                                    line.coords = coords
-                        kml.save(str(cables_kml))
-                        print(f"PREGENERATE: Generated {cables_kml} using simplekml")
-                    except Exception as simple_error:
-                        print(f"PREGENERATE: SimpleKML fallback also failed: {simple_error}")
-
-            # Clean up GeoDataFrame and force garbage collection to release file handles
-            del cables_gdf
-            gc.collect()
+            if process_line_kml(str(cables_file), str(cables_kml), default_color_hex, default_opacity, use_random=True):
+                print(f"PREGENERATE: Generated cables KML with desktop processing")
+            else:
+                print(f"PREGENERATE: Failed to generate cables KML using desktop processing")
 
         except Exception as e:
             print(f"PREGENERATE: Error processing cables data: {e}")
@@ -569,11 +586,15 @@ def backup_directory(source_dir: Path, backup_suffix: str) -> Path:
     return backup_dir
 
 def safe_delete_backup(backup_dir: Path):
-    """Safely delete a backup directory with Windows permission handling."""
+    """Safely delete a backup directory with enhanced Windows permission handling."""
     if not backup_dir.exists():
         return
 
     log_pipeline_action("BACKUP DELETE", f"Attempting to delete: {backup_dir}")
+
+    # Force garbage collection before deletion to release file handles
+    gc.collect()
+    time.sleep(1)  # Give system time to release handles
 
     # Make all files writable (helps on Windows/OneDrive)
     for root, dirs, files in os.walk(backup_dir):
@@ -588,26 +609,28 @@ def safe_delete_backup(backup_dir: Path):
             except Exception:
                 pass  # Ignore permission errors during chmod
 
-    # Try deletion with retries
-    for attempt in range(1, 6):
+    # Try deletion with increased retries and longer delays
+    for attempt in range(1, 11):  # Increased to 10 attempts
         try:
             shutil.rmtree(backup_dir)
             log_pipeline_action("BACKUP DELETE", f"Successfully deleted: {backup_dir}")
             return
         except PermissionError as e:
-            log_pipeline_action("BACKUP DELETE", f"PermissionError on attempt {attempt}/5: {e}. Retrying in 2s...")
-            time.sleep(2)
-            # Force garbage collection to release any lingering file handles
+            wait_time = min(3 + attempt, 8)  # Progressive delay up to 8s
+            log_pipeline_action("BACKUP DELETE", f"PermissionError on attempt {attempt}/10: {e}. Retrying in {wait_time}s...")
+            time.sleep(wait_time)
+            # Force garbage collection again
             gc.collect()
         except Exception as e:
             log_pipeline_action("BACKUP DELETE", f"Failed to delete backup {backup_dir}: {e}")
             break
 
-    # Final fallback - ignore errors
+    # Final fallback - ignore errors and extended cleanup
     try:
         shutil.rmtree(backup_dir, ignore_errors=True)
+        time.sleep(2)  # Wait for ignore_errors to complete
         if backup_dir.exists():
-            log_pipeline_action("BACKUP DELETE", f"Could not delete backup {backup_dir} after retries - manual cleanup needed")
+            log_pipeline_action("BACKUP DELETE", f"Could not delete backup {backup_dir} after retries - manual cleanup needed: {backup_dir}")
         else:
             log_pipeline_action("BACKUP DELETE", f"Backup eventually deleted via ignore_errors")
     except Exception as e:
@@ -632,6 +655,38 @@ def log_pipeline_action(action: str, details: str = ""):
     """Log pipeline actions with timestamps."""
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     print(f"PIPELINE [{timestamp}]: {action} {details}")
+
+def fix_duplicate_kml_ids(kml_path: Path):
+    """Fix duplicate IDs in KML files by appending counters."""
+    if not kml_path.exists():
+        return False
+
+    try:
+        ET.register_namespace('', 'http://www.opengis.net/kml/2.2')
+        tree = ET.parse(kml_path)
+        root = tree.getroot()
+
+        # Find all placemarks and track IDs
+        seen_ids = set()
+        placemarks = root.findall('.//{http://www.opengis.net/kml/2.2}Placemark')
+
+        for pm in placemarks:
+            pm_id = pm.get('id')
+            if pm_id:
+                original_id = pm_id
+                counter = 1
+                while pm_id in seen_ids:
+                    pm_id = f"{original_id}_{counter}"
+                    counter += 1
+                if pm_id != original_id:
+                    pm.set('id', pm_id)
+                seen_ids.add(pm_id)
+
+        tree.write(kml_path, encoding='utf-8', xml_declaration=True)
+        return True
+    except Exception as e:
+        print(f"Failed to fix duplicate IDs in {kml_path}: {e}")
+        return False
 
 def refresh_static_data():
     """Refresh STATIC data with granular change detection and conditional KML regeneration."""
@@ -698,6 +753,7 @@ def refresh_static_data():
 
         needs_kml_regen = bool(changed_layers) or not kmls_exist
 
+        kml_generation_success = True
         if needs_kml_regen:
             log_pipeline_action("STATIC REFRESH", f"Changed layers: {changed_layers}, KMLs exist: {kmls_exist} - regenerating KMLs")
             try:
@@ -705,7 +761,11 @@ def refresh_static_data():
                 log_pipeline_action("STATIC REFRESH", "KML regeneration completed")
             except Exception as e:
                 log_pipeline_action("STATIC REFRESH", f"KML regeneration failed: {e}")
-                return False
+                kml_generation_success = False
+
+        # Only mark as successful if both download and KML generation succeeded
+        if not kml_generation_success:
+            return False
         else:
             log_pipeline_action("STATIC REFRESH", "No changes detected and KMLs exist - skipping regeneration")
 
