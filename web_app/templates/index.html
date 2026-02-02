@@ -62,7 +62,7 @@
                         <p class="text-muted small">Select layers and customize their appearance</p>
 
                         <!-- EEZ -->
-                        <div class="row mb-2 align-items-center">
+                        <div class="row mb-1 align-items-center">
                             <div class="col-md-3">
                                 <div class="form-check mb-0">
                                     <input class="form-check-input layer-checkbox" type="checkbox" id="eez" name="eez">
@@ -70,6 +70,7 @@
                                         Exclusive Economic Zone (200nm)
                                     </label>
                                 </div>
+                                <small class="text-muted ms-3">Source: MarineRegions v12</small>
                             </div>
                             <div class="col-md-2">
                                 <input type="color" class="form-control form-control-color eez-control" id="eez_color" name="eez_color" value="#0000ff" title="Blue">
@@ -84,7 +85,7 @@
                         </div>
 
                         <!-- Territorial Waters -->
-                        <div class="row mb-2 align-items-center">
+                        <div class="row mb-1 align-items-center">
                             <div class="col-md-3">
                                 <div class="form-check mb-0">
                                     <input class="form-check-input layer-checkbox" type="checkbox" id="territorial" name="territorial">
@@ -92,6 +93,7 @@
                                         Territorial Waters (12nm)
                                     </label>
                                 </div>
+                                <small class="text-muted ms-3">Source: MarineRegions v4</small>
                             </div>
                             <div class="col-md-2">
                                 <input type="color" class="form-control form-control-color territorial-control" id="territorial_color" name="territorial_color" value="#ffff00" title="Yellow">
@@ -106,7 +108,7 @@
                         </div>
 
                         <!-- Contiguous Zone -->
-                        <div class="row mb-2 align-items-center">
+                        <div class="row mb-1 align-items-center">
                             <div class="col-md-3">
                                 <div class="form-check mb-0">
                                     <input class="form-check-input layer-checkbox" type="checkbox" id="contiguous" name="contiguous">
@@ -114,6 +116,7 @@
                                         Contiguous Zone (24nm)
                                     </label>
                                 </div>
+                                <small class="text-muted ms-3">Source: MarineRegions v4</small>
                             </div>
                             <div class="col-md-2">
                                 <input type="color" class="form-control form-control-color contiguous-control" id="contiguous_color" name="contiguous_color" value="#00ff00" title="Green">
@@ -128,7 +131,7 @@
                         </div>
 
                         <!-- Extended Continental Shelf -->
-                        <div class="row mb-2 align-items-center">
+                        <div class="row mb-1 align-items-center">
                             <div class="col-md-3">
                                 <div class="form-check mb-0">
                                     <input class="form-check-input layer-checkbox" type="checkbox" id="ecs" name="ecs">
@@ -136,6 +139,7 @@
                                         Extended Continental Shelf
                                     </label>
                                 </div>
+                                <small class="text-muted ms-3">Source: MarineRegions v2</small>
                             </div>
                             <div class="col-md-2">
                                 <input type="color" class="form-control form-control-color ecs-control" id="ecs_color" name="ecs_color" value="#8b4513" title="Brown">
@@ -150,7 +154,7 @@
                         </div>
 
                         <!-- Marine Protected Areas -->
-                        <div class="row mb-2 align-items-center">
+                        <div class="row mb-1 align-items-center">
                             <div class="col-md-3">
                                 <div class="form-check mb-0">
                                     <input class="form-check-input layer-checkbox" type="checkbox" id="mpa" name="mpa">
@@ -158,6 +162,7 @@
                                         Marine Protected Areas
                                     </label>
                                 </div>
+                                <small class="text-muted ms-3">Source: Protected Planet WDPA</small>
                             </div>
                             <div class="col-md-2">
                                 <input type="color" class="form-control form-control-color mpa-control" id="mpa_color" name="mpa_color" value="#ff0000" title="Red">
@@ -172,7 +177,7 @@
                         </div>
 
                         <!-- Submarine Cables -->
-                        <div class="row mb-2 align-items-center">
+                        <div class="row mb-1 align-items-center">
                             <div class="col-md-3">
                                 <div class="form-check mb-0">
                                     <input class="form-check-input layer-checkbox" type="checkbox" id="cables" name="cables">
@@ -180,6 +185,7 @@
                                         Submarine Cables
                                     </label>
                                 </div>
+                                <small class="text-muted ms-3">Source: SubmarineCableMap</small>
                             </div>
                             <div class="col-md-2">
                                 <input type="color" class="form-control form-control-color cables-color-control" id="cables_color" name="cables_color" value="#ffffff" title="White">
@@ -201,7 +207,7 @@
                         </div>
 
                         <!-- Ocean Currents (Country) -->
-                        <div class="row mb-2 align-items-center">
+                        <div class="row mb-1 align-items-center">
                             <div class="col-md-3">
                                 <div class="form-check mb-0">
                                     <input class="form-check-input layer-checkbox" type="checkbox" id="seastate_country" name="seastate_country">
@@ -209,6 +215,7 @@
                                         Ocean Currents (Country)
                                     </label>
                                 </div>
+                                <small class="text-muted ms-3">Source: NASA OSCAR NRT</small>
                             </div>
                             <div class="col-md-2">
                                 <input type="color" class="form-control form-control-color seastate-control" id="seastate_color" name="seastate_color" value="#000000" title="Black">
@@ -221,16 +228,16 @@
                             </div>
                             <div class="col-md-2">
                                 <select class="form-select form-select-sm" id="seastate_density_country" name="seastate_density_country">
-                                    <option value="0.5">High</option>
+                                    <option value="0.5" selected>High</option>
                                     <option value="1.5">Medium</option>
-                                    <option value="3.0" selected>Low</option>
+                                    <option value="3.0">Low</option>
                                 </select>
                             </div>
                             <div class="col-md-3"></div>
                         </div>
 
                         <!-- Ocean Currents (Global) -->
-                        <div class="row mb-2 align-items-center">
+                        <div class="row mb-1 align-items-center">
                             <div class="col-md-3">
                                 <div class="form-check mb-0">
                                     <input class="form-check-input layer-checkbox" type="checkbox" id="seastate_global" name="seastate_global">
@@ -238,6 +245,7 @@
                                         Ocean Currents (Global)
                                     </label>
                                 </div>
+                                <small class="text-muted ms-3">Source: NASA OSCAR NRT</small>
                             </div>
                             <div class="col-md-2">
                                 <input type="color" class="form-control form-control-color seastate-control" id="seastate_color_global" name="seastate_color" value="#000000" title="Black">
@@ -267,6 +275,7 @@
                                         Navigation Warnings
                                     </label>
                                 </div>
+                                <small class="text-muted ms-3">Source: NGA MSI</small>
                             </div>
                             <div class="col-md-2">
                                 <input type="color" class="form-control form-control-color navwarnings-color-control" id="navwarnings_color" name="navwarnings_color" value="#ff0000" title="Red">
@@ -309,17 +318,6 @@
     </div>
 </div>
 
-<!-- Footer with source citations -->
-<div class="row mt-4">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-body text-center text-muted small">
-                <strong>Data sources:</strong> MarineRegions v12 EEZ / v4 Territorial Seas / v4 Contiguous Zones / v2 ECS |
-                Protected Planet WDPA Jan2026 | SubmarineCableMap API | NASA OSCAR NRT | NGA MSI Navigation Warnings
-            </div>
-        </div>
-    </div>
-</div>
 
 <script>
 // Initialize form state and event listeners
@@ -384,6 +382,9 @@ function setupEventListeners() {
         if (this.checked) {
             // Auto-switch country currents to High density when selected
             document.getElementById('seastate_density_country').value = '0.5';
+        } else {
+            // Reset to Low when unchecked
+            document.getElementById('seastate_density_country').value = '3.0';
         }
     });
 }
@@ -491,9 +492,10 @@ function resetStylingToDefaults() {
     document.getElementById('navwarnings_color').value = '#ff0000';
     document.getElementById('navwarnings_opacity').value = '80';
 
-    // Reset density selections (Low for both, matching desktop)
-    document.getElementById('seastate_density_country').value = '3.0';
-    document.getElementById('seastate_density_global').value = '3.0';
+    // Reset density selections - NEVER default to Medium (desktop behavior)
+    // Global currents: Low, Country currents: Low (will auto-switch to High when country selected)
+    document.getElementById('seastate_density_country').value = '3.0'; // Low
+    document.getElementById('seastate_density_global').value = '3.0';   // Low
 
     // Reset checkboxes to desktop defaults (random/custom checked)
     document.getElementById('cables_random').checked = true;
