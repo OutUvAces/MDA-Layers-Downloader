@@ -443,8 +443,8 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
         # Skip the old layer-by-layer processing since we did per-country above
         return
 
-    # Process WDPA data for MPAs (only if processing static layers or WDPA specifically changed)
-    if process_static_layers or ('wdpa' in (changed_layers or [])):
+    # Process WDPA data for MPAs (only if processing static layers)
+    if process_static_layers:
         wdpa_dir = STATIC_CACHE_DIR / "wdpa"
         wdpa_files = list(wdpa_dir.glob("*.zip"))
         if wdpa_files:
@@ -1243,12 +1243,14 @@ def refresh_static_data():
     static_dir = RAW_SOURCE_DIR / "static"
 
     # Check age using timestamp file
-    timestamp_path = os.path.join(static_dir, '.last_refresh_static')
+    timestamp_path = os.path.join(STATIC_CACHE_DIR, '.last_refresh_static')
     if os.path.exists(timestamp_path):
-        last_time = float(open(timestamp_path).read().strip())
-        age_days = (time.time() - last_time) / (3600 * 24)  # Convert to days
+        age_days = (time.time() - os.path.getmtime(timestamp_path)) / (3600 * 24)
+        age_str = f"{age_days:.1f} days"
     else:
         age_days = float('inf')
+        age_str = "inf days"
+    print(f"STATIC REFRESH: Age {age_str} (threshold: 30d)")
 
     force_refresh = os.environ.get('FORCE_REFRESH', '').lower() in ('true', '1', 'yes')
 
@@ -1263,13 +1265,14 @@ def refresh_static_data():
         not cables_dir.exists()
     )
 
-    if not force_refresh and age_days <= 30 and not shapefiles_missing:
-        log_pipeline_action("STATIC REFRESH", f"Skipped - age {age_days:.1f}d <= 30d threshold, shapefiles exist")
+    if not force_refresh and age_days <= 30 and age_days != float('inf') and not shapefiles_missing:
+        print("STATIC REFRESH: Skipped - recent data")
         return True  # Not an error, just no refresh needed
 
-    log_pipeline_action("STATIC REFRESH", f"Refresh triggered - age {age_days:.1f}d > 30d threshold, force: {force_refresh}")
+    log_pipeline_action("STATIC REFRESH", f"Refresh triggered - age {age_str} > 30d threshold, force: {force_refresh}")
 
     # Get old layer hashes for comparison
+    metadata = load_cache_metadata()
     old_layer_hashes = metadata.get('static_layers', {})
 
     # Create backup before any changes
@@ -1340,9 +1343,10 @@ def refresh_static_data():
 
         # Success: delete backup and save timestamp
         safe_delete_backup(backup_dir)
-        timestamp_path = os.path.join(static_dir, '.last_refresh_static')
+        timestamp_path = os.path.join(STATIC_CACHE_DIR, '.last_refresh_static')
         with open(timestamp_path, 'w') as f:
             f.write(str(time.time()))
+        print("STATIC REFRESH: Updated last_refresh_static timestamp")
         log_pipeline_action("STATIC REFRESH", "Completed successfully")
         return True
 
@@ -1355,21 +1359,23 @@ def refresh_dynamic_data():
     dynamic_dir = RAW_SOURCE_DIR / "dynamic"
 
     # Check age using timestamp file
-    timestamp_path = os.path.join(dynamic_dir, '.last_refresh_dynamic')
+    timestamp_path = os.path.join(DYNAMIC_CACHE_DIR, '.last_refresh_dynamic')
     if os.path.exists(timestamp_path):
-        last_time = float(open(timestamp_path).read().strip())
-        age_hours = (time.time() - last_time) / 3600
+        age_hours = (time.time() - os.path.getmtime(timestamp_path)) / 3600
+        age_str = f"{age_hours:.1f} hours"
     else:
         age_hours = float('inf')
+        age_str = "inf hours"
+    print(f"DYNAMIC REFRESH: Age {age_str} (threshold: 12h)")
 
     refresh_threshold_hours = 12  # 12 hours for dynamic data
     force_refresh = os.environ.get('FORCE_REFRESH', '').lower() in ('true', '1', 'yes')
 
-    if not force_refresh and age_hours <= refresh_threshold_hours and dynamic_dir.exists() and any(dynamic_dir.rglob("*")):
-        log_pipeline_action("DYNAMIC REFRESH", f"Skipped - age {age_hours:.1f}h <= {refresh_threshold_hours}h threshold")
+    if not force_refresh and age_hours <= refresh_threshold_hours and age_hours != float('inf') and dynamic_dir.exists() and any(dynamic_dir.rglob("*")):
+        print("DYNAMIC REFRESH: Skipped - recent data")
         return True  # Not an error, just no refresh needed
 
-    log_pipeline_action("DYNAMIC REFRESH", f"Refresh triggered - age {age_hours:.1f}h > {refresh_threshold_hours}h threshold, force: {force_refresh}")
+    log_pipeline_action("DYNAMIC REFRESH", f"Refresh triggered - age {age_str} > 12h threshold, force: {force_refresh}")
 
     # Create backup before downloading
     backup_dir = backup_directory(dynamic_dir, "dynamic_pre_download")
@@ -1410,9 +1416,10 @@ def refresh_dynamic_data():
 
         # Success: delete backup and save timestamp
         safe_delete_backup(backup_dir)
-        timestamp_path = os.path.join(dynamic_dir, '.last_refresh_dynamic')
+        timestamp_path = os.path.join(DYNAMIC_CACHE_DIR, '.last_refresh_dynamic')
         with open(timestamp_path, 'w') as f:
             f.write(str(time.time()))
+        print("DYNAMIC REFRESH: Updated last_refresh_dynamic timestamp")
         log_pipeline_action("DYNAMIC REFRESH", "Completed successfully")
         return True
 
