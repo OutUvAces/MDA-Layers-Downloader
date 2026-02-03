@@ -240,11 +240,12 @@ def download_and_extract_wdpa_shp_zip(cache_dir: str, task: LayerTask, report_pr
 
                     if use_tqdm:
                         with open(zip_path, 'wb') as f, tqdm(
-                            desc="Downloading WDPA marine shapefile ZIP",
                             total=total_size,
+                            desc="Downloading WDPA marine shapefile ZIP",
                             unit='B',
                             unit_scale=True,
-                            unit_divisor=1024
+                            unit_divisor=1024,
+                            bar_format='{desc}: {total_fmt} [{elapsed}, {rate_fmt}{postfix}]'
                         ) as pbar:
                             for chunk in response.iter_content(chunk_size=8192):
                                 if chunk:

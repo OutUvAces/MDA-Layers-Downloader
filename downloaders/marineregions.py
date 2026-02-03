@@ -217,6 +217,13 @@ def refresh_static_caches():
                         print(f"MARINEREGIONS: Got response for {layer_info['description']}, status: {response.status_code}")
                         response.raise_for_status()
 
+                        # Validate that we got a ZIP file (check Content-Type header)
+                        content_type = response.headers.get('Content-Type', '').lower()
+                        if 'zip' not in content_type and 'application/octet-stream' not in content_type:
+                            print(f"MARINEREGIONS: WARNING - Content-Type '{content_type}' may not be a ZIP file for {layer_info['description']}")
+                            response.close()
+                            continue
+
                         # Get total size for progress feedback
                         total_size = int(response.headers.get('Content-Length', 0))
 
@@ -225,11 +232,12 @@ def refresh_static_caches():
                         try:
                             from tqdm import tqdm
                             with open(zip_path, 'wb') as f, tqdm(
-                                desc=f"Downloading {layer_info['description']}",
                                 total=total_size,
+                                desc=f"Downloading {layer_info['description']}",
                                 unit='B',
                                 unit_scale=True,
-                                ncols=80
+                                unit_divisor=1024,
+                                bar_format='{desc}: {total_fmt} [{elapsed}, {rate_fmt}{postfix}]'
                             ) as pbar:
                                 downloaded_size = 0
                                 for chunk in response.iter_content(chunk_size=8192):
@@ -256,10 +264,18 @@ def refresh_static_caches():
                             continue
 
                         # Validate that we actually downloaded a ZIP file
+                        import zipfile
+                        if not zipfile.is_zipfile(zip_path):
+                            print(f"MARINEREGIONS: ERROR - Downloaded file is not a valid ZIP for {layer_info['description']}")
+                            print(f"MARINEREGIONS: Deleting invalid file and skipping")
+                            zip_path.unlink()
+                            continue
+
+                        # Additional validation by checking ZIP header
                         with open(zip_path, 'rb') as f:
                             header = f.read(20)
                             if not header.startswith(b'PK\x03\x04'):
-                                print(f"MARINEREGIONS: ERROR - Downloaded file is not a ZIP (starts with {header})")
+                                print(f"MARINEREGIONS: ERROR - Downloaded file header invalid (starts with {header[:10]})")
                                 print(f"MARINEREGIONS: Skipping {layer_info['description']} - no shapefile data available")
                                 zip_path.unlink()
                                 continue

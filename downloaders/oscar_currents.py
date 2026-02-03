@@ -97,11 +97,12 @@ async def download_oscar_granule_async(session, granule_url: str, temp_nc: str, 
 
         if use_tqdm:
             with open(temp_nc, 'wb') as f, tqdm(
-                desc="Downloading OSCAR ocean currents .nc",
                 total=total_size,
+                desc="Downloading OSCAR ocean currents .nc",
                 unit='B',
                 unit_scale=True,
-                unit_divisor=1024
+                unit_divisor=1024,
+                bar_format='{desc}: {total_fmt} [{elapsed}, {rate_fmt}{postfix}]'
             ) as pbar:
                 async for chunk in response.content.iter_chunked(8192):
                     f.write(chunk)
@@ -739,11 +740,12 @@ def process(task: LayerTask, report_progress, output_dir: str, cache_dir: str, u
 
                 if use_tqdm:
                     with open(temp_nc, 'wb') as f, tqdm(
-                        desc="Downloading OSCAR ocean currents .nc",
                         total=total_size,
+                        desc="Downloading OSCAR ocean currents .nc",
                         unit='B',
                         unit_scale=True,
-                        unit_divisor=1024
+                        unit_divisor=1024,
+                        bar_format='{desc}: {total_fmt} [{elapsed}, {rate_fmt}{postfix}]'
                     ) as pbar:
                         for chunk in r.iter_content(chunk_size=8192):
                             if chunk:
@@ -891,11 +893,12 @@ def refresh_dynamic_caches():
 
                 if use_tqdm:
                     with open(cache_file, 'wb') as f, tqdm(
-                        desc="Downloading OSCAR ocean currents .nc",
                         total=total_size,
+                        desc="Downloading OSCAR ocean currents .nc",
                         unit='B',
                         unit_scale=True,
-                        unit_divisor=1024
+                        unit_divisor=1024,
+                        bar_format='{desc}: {total_fmt} [{elapsed}, {rate_fmt}{postfix}]'
                     ) as pbar:
                         for chunk in response.iter_content(chunk_size=8192):
                             if chunk:

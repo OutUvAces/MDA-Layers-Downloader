@@ -410,21 +410,20 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                     temp_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}_temp.kml"
                     final_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}.kml"
 
-                    # Optimize for faster KML generation (reduce columns and simplify geometry)
-                    # Keep only essential columns to reduce file size and processing time
+                    # Optimize for faster KML generation (reduce columns and simplify geometry aggressively)
+                    # Keep only minimal essential columns to reduce file size and processing time
                     essential_cols = ['geometry']
+                    # Only keep ISO code for reference, skip territory name to reduce processing
                     if 'iso_ter1' in country_layer.columns:
                         essential_cols.append('iso_ter1')
                     elif 'ISO_TERR1' in country_layer.columns:
                         essential_cols.append('ISO_TERR1')
-                    if 'TERRITORY1' in country_layer.columns:
-                        essential_cols.append('TERRITORY1')
 
                     country_layer = country_layer[essential_cols].copy()
 
-                    # Simplify geometry for faster processing and smaller files
-                    # Use 0.001 degrees (~100m) tolerance for reasonable detail without excessive size
-                    country_layer['geometry'] = country_layer.geometry.simplify(0.001, preserve_topology=True)
+                    # Aggressive geometry simplification for faster processing and smaller files
+                    # Use 0.005 degrees (~500m) tolerance - good balance of detail vs speed for large countries
+                    country_layer['geometry'] = country_layer.geometry.simplify(0.005, preserve_topology=True)
 
                     # Convert to KML using geopandas
                     country_layer.to_file(str(temp_kml), driver='KML')
