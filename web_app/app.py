@@ -306,131 +306,130 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
             'opacity': 20,
             'kml_suffix': 'ecs'
         }
-    }
+        }
 
-    # Find all shapefiles in the marineregions directory
-    all_shp_files = list(marineregions_dir.glob("*.shp"))
-    print(f"PREGENERATE: Found {len(all_shp_files)} shapefiles in marineregions: {[str(f.name) for f in all_shp_files]}")
+        # Find all shapefiles in the marineregions directory
+        all_shp_files = list(marineregions_dir.glob("*.shp"))
+        print(f"PREGENERATE: Found {len(all_shp_files)} shapefiles in marineregions: {[str(f.name) for f in all_shp_files]}")
 
-    if all_shp_files:
-        # Load each of the 4 shapefiles separately into their own GeoDataFrames
-        layer_gdfs = {}
-        all_countries = set()
+        if all_shp_files:
+            # Load each of the 4 shapefiles separately into their own GeoDataFrames
+            layer_gdfs = {}
+            all_countries = set()
 
-        print(f"PREGENERATE: Loading MarineRegions shapefiles separately...")
+            print(f"PREGENERATE: Loading MarineRegions shapefiles separately...")
 
-        for layer_key, config in layer_configs.items():
-            try:
-                shp_files = [f for f in all_shp_files if f.match(config['shp_pattern']) or layer_key.lower() in str(f).lower()]
-                if not shp_files:
-                    print(f"PREGENERATE: No shapefiles found for {layer_key}")
-                    continue
-
-                shp_file = shp_files[0]
-                print(f"PREGENERATE: Loading {layer_key} shapefile: {shp_file.name}")
-
-                # Load shapefile into GeoDataFrame
-                gdf = gpd.read_file(shp_file)
-                if gdf.empty:
-                    print(f"PREGENERATE: {layer_key} shapefile is empty")
-                    continue
-
-                # Ensure EPSG:4326 early
-                if gdf.crs != 'EPSG:4326':
-                    gdf = gdf.to_crs('EPSG:4326')
-
-                # Store the GeoDataFrame
-                layer_gdfs[layer_key] = gdf
-
-                # Collect unique countries from this layer
-                iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
-                if iso_col:
-                    layer_countries = gdf[iso_col].unique()
-                    layer_countries = [c for c in layer_countries if c and not pd.isna(c)]
-                    all_countries.update(layer_countries)
-                    print(f"PREGENERATE: {layer_key} has {len(gdf)} features, {len(layer_countries)} countries")
-
-            except Exception as e:
-                print(f"PREGENERATE: Error loading {layer_key} shapefile: {e}")
-                continue
-
-        # Convert to sorted list
-        all_countries = sorted(list(all_countries))
-        print(f"PREGENERATE: Starting per-country MarineRegions processing ({len(all_countries)} countries)...")
-
-        # Process each country sequentially
-        import time
-        start_time = time.time()
-        processed_countries = 0
-
-        for country_code in all_countries:
-            country_start = time.time()
-            print(f"PREGENERATE: Processing MarineRegions for {country_code}...")
-
-            country_layers = 0
-            country_combined = None
-
-            # Process each layer for this country
             for layer_key, config in layer_configs.items():
-                if layer_key not in layer_gdfs:
-                    continue
-
-                gdf = layer_gdfs[layer_key]
-                iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
-                if not iso_col:
-                    continue
-
-                # Filter data for this country
-                country_layer = gdf[gdf[iso_col] == country_code]
-                if country_layer.empty:
-                    continue
-
                 try:
-                    # Clean only this small subset (no global make_valid().buffer(0))
-                    country_layer = country_layer[country_layer.geometry.is_valid & ~country_layer.geometry.is_empty]
-                    country_layer['geometry'] = country_layer['geometry'].make_valid()  # Keep make_valid, remove buffer(0)
+                    shp_files = [f for f in all_shp_files if f.match(config['shp_pattern']) or layer_key.lower() in str(f).lower()]
+                    if not shp_files:
+                        print(f"PREGENERATE: No shapefiles found for {layer_key}")
+                        continue
 
-                    # Optional light simplify for performance
-                    if len(country_layer) > 5:  # Only for larger country datasets
-                        country_layer = country_layer.copy()
-                        country_layer['geometry'] = country_layer.geometry.simplify(0.001, preserve_topology=True)
+                    shp_file = shp_files[0]
+                    print(f"PREGENERATE: Loading {layer_key} shapefile: {shp_file.name}")
 
-                    # Fix problematic fields (matching desktop)
-                    for col in country_layer.columns:
-                        if col in ['mrgid_sov1', 'mrgid_eez', 'mrgid_ter1', 'mrgid_sov2']:
-                            country_layer[col] = country_layer[col].fillna(0).astype(int)
-                        elif country_layer[col].dtype == 'object':
-                            country_layer[col] = country_layer[col].fillna('').astype(str)
+                    # Load shapefile into GeoDataFrame
+                    gdf = gpd.read_file(shp_file)
+                    if gdf.empty:
+                        print(f"PREGENERATE: {layer_key} shapefile is empty")
+                        continue
 
-                    # Create country directory
-                    country_iso_dir = country_dir / str(country_code)
-                    country_iso_dir.mkdir(exist_ok=True)
+                    # Ensure EPSG:4326 early
+                    if gdf.crs != 'EPSG:4326':
+                        gdf = gdf.to_crs('EPSG:4326')
 
-                    # Generate KML for this layer
-                    temp_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}_temp.kml"
-                    final_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}.kml"
+                    # Store the GeoDataFrame
+                    layer_gdfs[layer_key] = gdf
 
-                    # Drop all attributes for visualization-only layers (users don't need popups/details)
-                    # Keep only geometry for clean, fast KML generation
-                    country_layer = gpd.GeoDataFrame(geometry=country_layer.geometry, crs=country_layer.crs)
+                    # Collect unique countries from this layer
+                    iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
+                    if iso_col:
+                        layer_countries = gdf[iso_col].unique()
+                        layer_countries = [c for c in layer_countries if c and not pd.isna(c)]
+                        all_countries.update(layer_countries)
+                        print(f"PREGENERATE: {layer_key} has {len(gdf)} features, {len(layer_countries)} countries")
 
-                    # Optional: dissolve multiple features into single feature per country (cleaner KML)
-                    if len(country_layer) > 1:
-                        country_layer = gpd.GeoDataFrame(geometry=[country_layer.unary_union], crs=country_layer.crs)
+                except Exception as e:
+                    print(f"PREGENERATE: Error loading {layer_key} shapefile: {e}")
+                    continue
 
-                    # Conservative simplification matching main branch (preserve topology and detail)
-                    # Use 0.001 degrees (~100m) tolerance - keeps islands/coasts while reducing vertices
-                    country_layer['geometry'] = country_layer.geometry.simplify(tolerance=0.001, preserve_topology=True)
+            # Convert to sorted list
+            all_countries = sorted(list(all_countries))
+            print(f"PREGENERATE: Starting per-country MarineRegions processing ({len(all_countries)} countries)...")
 
-                    print(f"PREGENERATE: Writing simplified viz-only KML for {country_code} ({layer_count} layers)...")
+            # Process each country sequentially
+            import time
+            start_time = time.time()
+            processed_countries = 0
 
-                    # Convert to KML using geopandas
-                    country_layer.to_file(str(temp_kml), driver='KML')
+                for country_code in all_countries:
+                    country_start = time.time()
+                    print(f"PREGENERATE: Processing MarineRegions for {country_code}...")
 
-                    # Apply desktop styling using process_kml
-                    color_abgr = hex_to_kml_abgr(config['color_hex'], config['opacity'])
-                    if process_kml(str(temp_kml), str(final_kml), color_abgr):
-                        country_layers += 1
+                    country_layers = 0
+                    country_combined = None
+
+                    # Process each layer for this country
+                    for layer_key, config in layer_configs.items():
+                        if layer_key not in layer_gdfs:
+                            continue
+
+                        gdf = layer_gdfs[layer_key]
+                        iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
+                        if not iso_col:
+                            continue
+
+                        # Filter data for this country
+                        country_layer = gdf[gdf[iso_col] == country_code]
+                        if country_layer.empty:
+                            continue
+
+                        try:
+                            # Skip slow validity filtering for viz-only layers (make_valid will repair if needed)
+                            country_layer['geometry'] = country_layer['geometry'].make_valid()  # Keep make_valid for repairs
+
+                            # Optional light simplify for performance
+                            if len(country_layer) > 5:  # Only for larger country datasets
+                                country_layer = country_layer.copy()
+                                country_layer['geometry'] = country_layer.geometry.simplify(0.001, preserve_topology=True)
+
+                            # Fix problematic fields (matching desktop)
+                            for col in country_layer.columns:
+                                if col in ['mrgid_sov1', 'mrgid_eez', 'mrgid_ter1', 'mrgid_sov2']:
+                                    country_layer[col] = country_layer[col].fillna(0).astype(int)
+                                elif country_layer[col].dtype == 'object':
+                                    country_layer[col] = country_layer[col].fillna('').astype(str)
+
+                            # Create country directory
+                            country_iso_dir = country_dir / str(country_code)
+                            country_iso_dir.mkdir(exist_ok=True)
+
+                            # Generate KML for this layer
+                            temp_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}_temp.kml"
+                            final_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}.kml"
+
+                            # Drop all attributes for visualization-only layers (users don't need popups/details)
+                            # Keep only geometry for clean, fast KML generation
+                            country_layer = gpd.GeoDataFrame(geometry=country_layer.geometry, crs=country_layer.crs)
+
+                            # Optional: dissolve multiple features into single feature per country (cleaner KML)
+                            if len(country_layer) > 1:
+                                country_layer = gpd.GeoDataFrame(geometry=[country_layer.unary_union], crs=country_layer.crs)
+
+                            # Conservative simplification matching main branch (preserve topology and detail)
+                            # Use 0.001 degrees (~100m) tolerance - keeps islands/coasts while reducing vertices
+                            country_layer['geometry'] = country_layer.geometry.simplify(tolerance=0.001, preserve_topology=True)
+
+                            print(f"PREGENERATE: Writing simplified viz-only KML for {country_code} ({country_layers} layers)...")
+
+                            # Convert to KML using geopandas
+                            country_layer.to_file(str(temp_kml), driver='KML')
+
+                            # Apply desktop styling using process_kml
+                            color_abgr = hex_to_kml_abgr(config['color_hex'], config['opacity'])
+                            if process_kml(str(temp_kml), str(final_kml), color_abgr):
+                                country_layers += 1
                         # Clean up temp file
                         if temp_kml.exists():
                             temp_kml.unlink()
