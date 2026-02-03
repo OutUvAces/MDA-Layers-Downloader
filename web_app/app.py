@@ -1505,7 +1505,11 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(refresh_caches, 'interval', hours=12, id='cache_refresh')
 scheduler.start()
 
-# Cache refresh will be triggered on app startup (see signal handler below)
+# Run initial refresh only in reloader worker process
+if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    print("APP STARTUP: Running initial full cache refresh in worker process...")
+    refresh_caches()
+    print("APP STARTUP: Initial cache refresh completed - ready for requests")
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -1877,19 +1881,3 @@ def download(task_id, path_type):
 
     return send_file(zip_path, as_attachment=True, download_name=f'{task_id}_{path_type}.zip')
 
-
-if __name__ == '__main__':
-    # Only run Flask app if all required modules are available
-    try:
-        from flask import Flask
-
-        # Run cache refresh in worker process only (not reloader parent)
-        if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-            print("APP STARTUP: Running initial full cache refresh in worker process...")
-            refresh_caches()
-            print("APP STARTUP: Cache refresh completed - worker ready for requests")
-
-        app.run(debug=True, host='0.0.0.0', port=5000)
-    except ImportError as e:
-        print(f"Flask not available, skipping web server: {e}")
-        print("Cache refresh completed successfully!")
