@@ -19,6 +19,7 @@ if __name__ == '__main__':
     print(f"Starting MDA Layers Downloader Web Application on port {port}")
     print(f"Debug mode: {debug}")
 
+    # Only print startup message in main process (not reloader child)
     app.run(
         host='0.0.0.0',
         port=port,

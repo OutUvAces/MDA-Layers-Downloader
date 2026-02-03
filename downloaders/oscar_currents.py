@@ -721,8 +721,11 @@ def refresh_dynamic_caches():
 
     try:
         # Load environment variables from .env file if it exists
-        from dotenv import load_dotenv
-        load_dotenv()
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            print("OSCAR: python-dotenv not installed — install via: pip install python-dotenv")
 
         # Get NASA credentials from environment
         username = os.getenv('NASA_USERNAME')
