@@ -368,7 +368,6 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                 print(f"PREGENERATE: Processing MarineRegions for {country_code}...")
 
                 country_layers = 0
-                country_combined = None
 
                 # Process each layer for this country
                 for layer_key, config in layer_configs.items():
@@ -386,9 +385,6 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                         continue
 
                     try:
-                        # Skip slow validity filtering for viz-only layers (make_valid will repair if needed)
-                        country_layer['geometry'] = country_layer['geometry'].make_valid()  # Keep make_valid for repairs
-
                         # Fix problematic fields (matching desktop)
                         for col in country_layer.columns:
                             if col in ['mrgid_sov1', 'mrgid_eez', 'mrgid_ter1', 'mrgid_sov2']:
@@ -396,95 +392,44 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                             elif country_layer[col].dtype == 'object':
                                 country_layer[col] = country_layer[col].fillna('').astype(str)
 
-                            # Create country directory
-                            country_iso_dir = country_dir / str(country_code)
-                            country_iso_dir.mkdir(exist_ok=True)
+                        # Create country directory
+                        country_iso_dir = country_dir / str(country_code)
+                        country_iso_dir.mkdir(exist_ok=True)
 
-                            # Generate KML for this layer
-                            temp_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}_temp.kml"
-                            final_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}.kml"
+                        # Generate KML for this layer
+                        temp_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}_temp.kml"
+                        final_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}.kml"
 
-                            # Drop all attributes for visualization-only layers (users don't need popups/details)
-                            # Keep only geometry for clean, fast KML generation
-                            country_layer = gpd.GeoDataFrame(geometry=country_layer.geometry, crs=country_layer.crs)
+                        # Drop all attributes for visualization-only layers (users don't need popups/details)
+                        # Keep only geometry for clean, fast KML generation
+                        country_layer = gpd.GeoDataFrame(geometry=country_layer.geometry, crs=country_layer.crs)
 
-                            # Optional: dissolve multiple features into single feature per country (cleaner KML)
-                            if len(country_layer) > 1:
-                                country_layer = gpd.GeoDataFrame(geometry=[country_layer.unary_union], crs=country_layer.crs)
+                        # Conservative simplification matching main branch (preserve topology and detail)
+                        # Use 0.001 degrees (~100m) tolerance - keeps islands/coasts while reducing vertices
+                        country_layer['geometry'] = country_layer.geometry.simplify(tolerance=0.001, preserve_topology=True)
 
-                            # Conservative simplification matching main branch (preserve topology and detail)
-                            # Use 0.001 degrees (~100m) tolerance - keeps islands/coasts while reducing vertices
-                            country_layer['geometry'] = country_layer.geometry.simplify(tolerance=0.001, preserve_topology=True)
+                        print(f"PREGENERATE: Writing viz-only KML for {country_code} ({country_layers} layers, simplified)...")
 
-                            print(f"PREGENERATE: Writing simplified viz-only KML for {country_code} ({country_layers} layers)...")
+                        # Convert to KML using geopandas
+                        country_layer.to_file(str(temp_kml), driver='KML')
 
-                            # Convert to KML using geopandas
-                            country_layer.to_file(str(temp_kml), driver='KML')
-
-                            # Apply desktop styling using process_kml
-                            color_abgr = hex_to_kml_abgr(config['color_hex'], config['opacity'])
-                            if process_kml(str(temp_kml), str(final_kml), color_abgr):
-                                country_layers += 1
-                        # Clean up temp file
-                        if temp_kml.exists():
-                            temp_kml.unlink()
-                    else:
-                        print(f"PREGENERATE: Failed to style {config['kml_suffix']} for {country_code}, using basic styling")
-                        # Fallback: create KML with basic styling
-                        try:
-                            with open(str(final_kml), 'w', encoding='utf-8') as f:
-                                f.write(f"""<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-  <Document>
-    <name>{config['kml_suffix'].replace('_', ' ').title()} - {country_code}</name>
-    <Style id="defaultStyle">
-      <LineStyle>
-        <color>{color_abgr}</color>
-        <width>2</width>
-      </LineStyle>
-      <PolyStyle>
-        <color>{color_abgr.replace('ff', '40')}</color>
-        <fill>1</fill>
-        <outline>1</outline>
-      </PolyStyle>
-    </Style>""")
-
-                                # Add placemarks from the geopandas KML
-                                with open(str(temp_kml), 'r', encoding='utf-8') as temp_f:
-                                    temp_content = temp_f.read()
-                                    # Extract Placemark elements and add styleUrl
-                                    import re
-                                    placemark_pattern = r'(<Placemark>.*?</Placemark>)'
-                                    placemarks = re.findall(placemark_pattern, temp_content, re.DOTALL)
-
-                                    for placemark in placemarks:
-                                        # Add styleUrl if not present
-                                        if '<styleUrl>' not in placemark:
-                                            styled_placemark = placemark.replace('<Placemark>', '<Placemark>\n      <styleUrl>#defaultStyle</styleUrl>', 1)
-                                        else:
-                                            styled_placemark = placemark
-                                        f.write(f"    {styled_placemark}\n")
-
-                                f.write("""  </Document>
-</kml>""")
-
+                        # Apply desktop styling using process_kml
+                        color_abgr = hex_to_kml_abgr(config['color_hex'], config['opacity'])
+                        if process_kml(str(temp_kml), str(final_kml), color_abgr):
                             country_layers += 1
-                            print(f"PREGENERATE: Generated {config['kml_suffix']} for {country_code} with fallback styling")
-                        except Exception as fallback_error:
-                            print(f"PREGENERATE: Fallback styling also failed for {country_code}: {fallback_error}")
 
                         # Clean up temp file
                         if temp_kml.exists():
                             temp_kml.unlink()
 
-                except Exception as layer_error:
-                    print(f"PREGENERATE: Error processing {layer_key} for {country_code}: {layer_error}")
-                    continue
+                    except Exception as layer_error:
+                        print(f"PREGENERATE: Error processing {layer_key} for {country_code}: {layer_error}")
+                        continue
 
-            # Report completion for this country
-            country_elapsed = time.time() - country_start
-            processed_countries += 1
-            print(f"PREGENERATE: Completed {country_code} ({country_layers} layers) in {country_elapsed:.1f}s")
+                # Report completion for this country
+                country_elapsed = time.time() - country_start
+                processed_countries += 1
+                print(f"PREGENERATE: Completed {country_code} ({country_layers} layers) in {country_elapsed:.1f}s")
 
         # Clean up layer GeoDataFrames
         for gdf in layer_gdfs.values():
