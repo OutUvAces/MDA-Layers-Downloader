@@ -225,13 +225,24 @@ def refresh_static_caches():
                             if chunk:
                                 content += chunk
                                 downloaded_size += len(chunk)
-                                if downloaded_size > 50 * 1024 * 1024:  # 50MB limit
+                                if downloaded_size > 100 * 1024 * 1024:  # 100MB limit (increased for large shapefiles)
                                     print(f"MARINEREGIONS: Download too large ({downloaded_size} bytes), aborting")
                                     response.close()
                                     continue
 
                         print(f"MARINEREGIONS: Downloaded {len(content)} bytes for {layer_info['description']}")
                         response.close()
+
+                        # Validate that we actually downloaded a ZIP file
+                        if not content.startswith(b'PK\x03\x04'):
+                            print(f"MARINEREGIONS: ERROR - Downloaded file is not a ZIP (starts with {content[:20]})")
+                            print(f"MARINEREGIONS: Skipping {layer_info['description']} - no shapefile data available")
+                            continue
+
+                        with open(zip_path, 'wb') as f:
+                            f.write(content)
+
+                        print(f"MARINEREGIONS: Downloaded {layer_info['description']}, size = {zip_path.stat().st_size} bytes")
 
                     except requests.exceptions.Timeout:
                         print(f"MARINEREGIONS: Timeout downloading {layer_info['description']} - server not responding within 30s")
@@ -249,30 +260,6 @@ def refresh_static_caches():
                         print(f"MARINEREGIONS: Unexpected error downloading {layer_info['description']}: {e}")
                         print(f"MARINEREGIONS: Skipping {layer_info['description']} - unexpected error")
                         continue
-
-                    content = response.content
-
-                    # Debug: Check if we got HTML instead of ZIP
-                    content_start = content[:200].decode('utf-8', errors='ignore')
-                    if '<html' in content_start.lower() or '<!doctype html' in content_start.lower():
-                        print(f"MARINEREGIONS: ERROR - Received HTML page instead of ZIP for {layer_info['description']}")
-                        print(f"MARINEREGIONS: Content preview: {content_start[:200]}...")
-                        print(f"MARINEREGIONS: This likely means the download requires acceptance/login/CAPTCHA")
-                        print(f"MARINEREGIONS: Skipping {layer_info['description']} - no shapefile data available")
-                        continue
-
-                    with open(zip_path, 'wb') as f:
-                        f.write(content)
-
-                    # Validate that we actually downloaded a ZIP file
-                    if not content.startswith(b'PK\x03\x04'):
-                        print(f"MARINEREGIONS: ERROR - Downloaded file is not a ZIP (starts with {content[:20]})")
-                        print(f"MARINEREGIONS: This likely means the download requires acceptance/login/CAPTCHA")
-                        print(f"MARINEREGIONS: Skipping {layer_info['description']} - no shapefile data available")
-                        zip_path.unlink()
-                        continue
-
-                    print(f"MARINEREGIONS: Downloaded {layer_info['description']}, size = {zip_path.stat().st_size} bytes")
 
                 # Extract the ZIP file (always try to extract if shapefiles don't exist)
                 if not (expected_shp and expected_shp.exists()):
