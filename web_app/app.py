@@ -982,25 +982,6 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
         print(f"PREGENERATE: Found ocean currents data at {oscar_file} - skipping KML generation (requires OSCAR credentials)")
         print(f"PREGENERATE: Ocean currents processing will be available when NASA credentials are configured")
 
-    # Process cables (global) - use desktop process_line_kml for proper styling
-    cables_files = list(STATIC_CACHE_DIR.glob("cables_global.*"))
-    if cables_files:
-        cables_file = cables_files[0]
-        print(f"PREGENERATE: Processing cables data from {cables_file}")
-        try:
-            cables_kml = global_dir / "sub_cables.kml"
-
-            # Use desktop process_line_kml with random colors (handles duplicates automatically)
-            default_color_hex = "#ffffff"  # White cables
-            default_opacity = "50"
-
-            if process_line_kml(str(cables_file), str(cables_kml), default_color_hex, default_opacity, use_random=True):
-                print(f"PREGENERATE: Generated cables KML with desktop processing")
-            else:
-                print(f"PREGENERATE: Failed to generate cables KML using desktop processing")
-
-        except Exception as e:
-            print(f"PREGENERATE: Error processing cables data: {e}")
 
     # Process nav warnings (global)
     nav_files = list(DYNAMIC_CACHE_DIR.glob("nav_warnings/*"))
@@ -1198,13 +1179,15 @@ def has_layer_changed(old_layer_hashes: dict, new_layer_hashes: dict, layer_name
 def backup_directory(source_dir: Path, backup_suffix: str) -> Path:
     """Create a timestamped backup of a directory in temp location outside OneDrive."""
     import tempfile
+    import uuid
 
     # Use system temp directory instead of OneDrive to avoid permission issues
     temp_base = Path(tempfile.gettempdir()) / "mda_backups"
     temp_base.mkdir(exist_ok=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    backup_dir = temp_base / f"{source_dir.name}_backup_{timestamp}_{backup_suffix}"
+    unique_id = uuid.uuid4().hex[:8]  # 8-character unique suffix to prevent race conditions
+    backup_dir = temp_base / f"{source_dir.name}_backup_{timestamp}_{backup_suffix}_{unique_id}"
 
     if source_dir.exists():
         shutil.copytree(source_dir, backup_dir)
@@ -1894,30 +1877,21 @@ def download(task_id, path_type):
 
     return send_file(zip_path, as_attachment=True, download_name=f'{task_id}_{path_type}.zip')
 
-if __name__ == '__main__':
-    # Initial cache check on startup - run if cache is missing/empty regardless of flag
-    cache_needs_init = (
-        not CACHE_INITIALIZED_FILE.exists() or
-        not STATIC_CACHE_DIR.exists() or
-        not any(STATIC_CACHE_DIR.iterdir()) or  # Check if static cache is empty
-        not DYNAMIC_CACHE_DIR.exists()
-    )
+# Global flag to ensure cache refresh runs only once on first request
+_cache_refresh_done = False
 
-    if cache_needs_init:
-        print("APP STARTUP: Cache missing or empty - running initial setup...")
-        # Delete any stale flag file
-        if CACHE_INITIALIZED_FILE.exists():
-            CACHE_INITIALIZED_FILE.unlink()
-        # Run cache refresh
+@app.before_request
+def startup_refresh():
+    """Run initial cache refresh synchronously on first request (blocks until complete)"""
+    global _cache_refresh_done
+
+    if not _cache_refresh_done:
+        print("APP STARTUP: Running initial full cache refresh synchronously (this may take 5-10 minutes on first load)...")
         refresh_caches()
-        # Create initialization flag file
-        CACHE_INITIALIZED_FILE.parent.mkdir(parents=True, exist_ok=True)
-        CACHE_INITIALIZED_FILE.write_text("initialized")
-        print("APP STARTUP: Cache initialization completed and marked as done")
-    else:
-        print("APP STARTUP: Cache already initialized - skipping setup")
+        _cache_refresh_done = True
+        print("APP STARTUP: Cache refresh completed - Flask app ready for requests")
 
-
+if __name__ == '__main__':
     # Only run Flask app if all required modules are available
     try:
         from flask import Flask
