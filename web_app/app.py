@@ -1917,11 +1917,6 @@ if __name__ == '__main__':
     else:
         print("APP STARTUP: Cache already initialized - skipping setup")
 
-    # Start cache refresh in background before starting Flask app
-    print("APP STARTUP: Starting initial cache refresh in background...")
-    import threading
-    cache_thread = threading.Thread(target=refresh_caches, daemon=True)
-    cache_thread.start()
 
     # Only run Flask app if all required modules are available
     try:
