@@ -722,7 +722,6 @@ def refresh_dynamic_caches():
     try:
         # Load environment variables from .env file if it exists
         try:
-            from dotenv import load_dotenv
             # Try multiple possible locations for .env file
             env_paths = [
                 Path(__file__).parent.parent / '.env',  # downloaders/../.env
@@ -734,16 +733,28 @@ def refresh_dynamic_caches():
             for env_path in env_paths:
                 print(f"OSCAR: Trying .env at: {env_path}")
                 if env_path.exists():
-                    result = load_dotenv(env_path)
-                    print(f"OSCAR: Loaded .env from {env_path}, result: {result}")
-                    env_loaded = True
-                    break
+                    # Read .env file directly and set environment variables
+                    try:
+                        with open(env_path, 'r', encoding='utf-8') as f:
+                            for line in f:
+                                line = line.strip()
+                                if line and not line.startswith('#') and '=' in line:
+                                    key, value = line.split('=', 1)
+                                    key = key.strip()
+                                    value = value.strip()
+                                    os.environ[key] = value
+                                    print(f"OSCAR: Set {key} from .env file")
+                        env_loaded = True
+                        print(f"OSCAR: Successfully loaded credentials from {env_path}")
+                        break
+                    except Exception as e:
+                        print(f"OSCAR: Error reading .env file at {env_path}: {e}")
 
             if not env_loaded:
                 print("OSCAR: No .env file found in any expected location")
 
-        except ImportError:
-            print("OSCAR: python-dotenv not installed — install via: pip install python-dotenv")
+        except Exception as e:
+            print(f"OSCAR: Error loading environment variables: {e}")
 
         # Get NASA credentials from environment
         username = os.getenv('NASA_USERNAME')
