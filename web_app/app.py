@@ -532,7 +532,7 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                             temp_kml = country_iso_dir / f"{country_iso}_MPA_temp.kml"
 
                             # Clean MPA data
-                            country_mpa = country_mpa[country_mpa.geometry.is_valid & ~country_mpa.geometry.is_empty]
+                            # Skip slow validity filtering for viz-only layers (make_valid will repair if needed)
 
                             # Reduce columns to only essential ones for smaller/faster KML
                             keep_columns = ['NAME_ENG', 'DESIG_ENG', 'IUCN_CAT', 'STATUS', 'STATUS_YR', 'geometry']
@@ -677,7 +677,7 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                             temp_kml = country_iso_dir / f"{country_iso}_MPA_temp.kml"
 
                             # Clean MPA data
-                            country_mpa = country_mpa[country_mpa.geometry.is_valid & ~country_mpa.geometry.is_empty]
+                            # Skip slow validity filtering for viz-only layers (make_valid will repair if needed)
 
                             # Reduce columns to only essential ones for smaller/faster KML
                             keep_columns = ['NAME_ENG', 'DESIG_ENG', 'IUCN_CAT', 'STATUS', 'STATUS_YR', 'geometry']
@@ -834,7 +834,7 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                             temp_kml = country_iso_dir / f"{country_iso}_MPA_temp.kml"
 
                             # Clean MPA data
-                            country_mpa = country_mpa[country_mpa.geometry.is_valid & ~country_mpa.geometry.is_empty]
+                            # Skip slow validity filtering for viz-only layers (make_valid will repair if needed)
 
                             # Reduce columns to only essential ones for smaller/faster KML
                             keep_columns = ['NAME_ENG', 'DESIG_ENG', 'IUCN_CAT', 'STATUS', 'STATUS_YR', 'geometry']
@@ -1361,9 +1361,9 @@ def refresh_dynamic_data():
     metadata = load_cache_metadata()
     dynamic_dir = RAW_SOURCE_DIR / "dynamic"
 
-    # Check age - refresh only if older than 6 hours or missing, or force refresh
+    # Check age - refresh only if older than 12 hours or missing, or force refresh
     dynamic_age_hours = get_cache_age(metadata.get('last_refresh_dynamic'), 'hours')
-    refresh_threshold_hours = float(os.environ.get('DYNAMIC_REFRESH_HOURS', '6'))
+    refresh_threshold_hours = 12  # 12 hours for dynamic data (was 6)
     force_refresh = os.environ.get('FORCE_REFRESH', '').lower() in ('true', '1', 'yes')
 
     if not force_refresh and dynamic_age_hours <= refresh_threshold_hours and dynamic_dir.exists() and any(dynamic_dir.rglob("*")):
