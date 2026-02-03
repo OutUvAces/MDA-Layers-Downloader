@@ -41,6 +41,7 @@ Anaconda*.exe
 # Environment files
 environment.yml
 requirements.txt
+.env
 
 # Build scripts
 *.bat
