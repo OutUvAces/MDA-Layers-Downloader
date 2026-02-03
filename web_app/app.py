@@ -1538,11 +1538,17 @@ def run_download_task(task_id, settings, country_path, global_path, cache_path, 
     except Exception as e:
         progress_queue.put({"type": "error", "content": f"Task failed: {str(e)}"})
 
-@app.before_first_request
+# Flag to ensure cache refresh runs only once
+_cache_refresh_done = False
+
+@app.before_request
 def startup_refresh():
     """Run initial cache refresh on first HTTP request"""
-    print("APP STARTUP: Running initial cache refresh on first request...")
-    refresh_caches()
+    global _cache_refresh_done
+    if not _cache_refresh_done:
+        print("APP STARTUP: Running initial cache refresh on first request...")
+        refresh_caches()
+        _cache_refresh_done = True
 
 @app.route('/')
 def index():
