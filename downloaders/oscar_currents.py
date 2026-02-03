@@ -101,8 +101,7 @@ async def download_oscar_granule_async(session, granule_url: str, temp_nc: str, 
                 total=total_size,
                 unit='B',
                 unit_scale=True,
-                unit_divisor=1024,
-                colour='cyan'
+                unit_divisor=1024
             ) as pbar:
                 async for chunk in response.content.iter_chunked(8192):
                     f.write(chunk)
@@ -744,8 +743,7 @@ def process(task: LayerTask, report_progress, output_dir: str, cache_dir: str, u
                         total=total_size,
                         unit='B',
                         unit_scale=True,
-                        unit_divisor=1024,
-                        colour='cyan'
+                        unit_divisor=1024
                     ) as pbar:
                         for chunk in r.iter_content(chunk_size=8192):
                             if chunk:
@@ -897,8 +895,7 @@ def refresh_dynamic_caches():
                         total=total_size,
                         unit='B',
                         unit_scale=True,
-                        unit_divisor=1024,
-                        colour='cyan'
+                        unit_divisor=1024
                     ) as pbar:
                         for chunk in response.iter_content(chunk_size=8192):
                             if chunk:

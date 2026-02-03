@@ -244,8 +244,7 @@ def download_and_extract_wdpa_shp_zip(cache_dir: str, task: LayerTask, report_pr
                             total=total_size,
                             unit='B',
                             unit_scale=True,
-                            unit_divisor=1024,
-                            colour='blue'
+                            unit_divisor=1024
                         ) as pbar:
                             for chunk in response.iter_content(chunk_size=8192):
                                 if chunk:
