@@ -748,7 +748,6 @@ def refresh_dynamic_caches():
         # Get NASA credentials from environment
         username = os.getenv('NASA_USERNAME')
         password = os.getenv('NASA_PASSWORD')
-        print(f"OSCAR: Found username: {bool(username)}, password: {bool(password)}")
 
         if not username or not password:
             print("OSCAR: NASA_USERNAME and NASA_PASSWORD environment variables not set")
