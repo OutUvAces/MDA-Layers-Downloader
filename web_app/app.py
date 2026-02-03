@@ -1339,6 +1339,11 @@ def refresh_static_data():
         not cables_dir.exists()
     )
 
+    print(f"DEBUG: static_age_days={static_age_days}, static_changed_flag={static_changed_flag}, shapefiles_missing={shapefiles_missing}")
+    print(f"DEBUG: marineregions_dir.exists()={marineregions_dir.exists()}")
+    print(f"DEBUG: wdpa_dir.exists()={wdpa_dir.exists()}")
+    print(f"DEBUG: cables_dir.exists()={cables_dir.exists()}")
+
     if static_age_days <= 30 and not static_changed_flag and not shapefiles_missing:
         log_pipeline_action("STATIC REFRESH", f"Skipped - age {static_age_days:.1f} days, no change flag, shapefiles exist")
         return True  # Not an error, just no refresh needed
