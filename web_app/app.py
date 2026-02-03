@@ -1522,7 +1522,7 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(refresh_caches, 'interval', hours=12, id='cache_refresh')
 scheduler.start()
 
-# Cache refresh will be triggered on first request (see @app.before_first_request below)
+# Cache refresh will be triggered on first request (see @app.before_request below)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -1552,14 +1552,17 @@ def run_download_task(task_id, settings, country_path, global_path, cache_path, 
 
 # Flag to ensure cache refresh runs only once
 _cache_refresh_done = False
+_cache_refresh_thread = None
 
 @app.before_request
 def startup_refresh():
     """Run initial cache refresh on first HTTP request"""
-    global _cache_refresh_done
-    if not _cache_refresh_done:
-        print("APP STARTUP: Running initial cache refresh on first request...")
-        refresh_caches()
+    global _cache_refresh_done, _cache_refresh_thread
+    if not _cache_refresh_done and _cache_refresh_thread is None:
+        print("APP STARTUP: Starting initial cache refresh in background...")
+        import threading
+        _cache_refresh_thread = threading.Thread(target=refresh_caches, daemon=True)
+        _cache_refresh_thread.start()
         _cache_refresh_done = True
 
 @app.route('/')
