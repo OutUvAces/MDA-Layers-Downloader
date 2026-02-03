@@ -1255,9 +1255,10 @@ def refresh_static_data():
     metadata = load_cache_metadata()
     static_dir = RAW_SOURCE_DIR / "static"
 
-    # Check if refresh is needed (30 days OR manual flag OR missing shapefiles)
+    # Check if refresh is needed (30 days OR manual flag OR missing shapefiles OR force refresh)
     static_age_days = get_cache_age(metadata.get('last_refresh_static'), 'days')
     static_changed_flag = metadata.get('static_changed', False)
+    force_refresh = os.environ.get('FORCE_REFRESH', '').lower() in ('true', '1', 'yes')
 
     # Also check if shapefiles actually exist
     marineregions_dir = static_dir / "marineregions"
@@ -1270,7 +1271,7 @@ def refresh_static_data():
         not cables_dir.exists()
     )
 
-    if static_age_days <= 30 and not static_changed_flag and not shapefiles_missing:
+    if not force_refresh and static_age_days <= 30 and not static_changed_flag and not shapefiles_missing:
         log_pipeline_action("STATIC REFRESH", f"Skipped - age {static_age_days:.1f} days, no change flag, shapefiles exist")
         return True  # Not an error, just no refresh needed
 
@@ -1354,15 +1355,22 @@ def refresh_static_data():
     return False
 
 def refresh_dynamic_data():
-    """Refresh DYNAMIC data unconditionally with immediate KML regeneration."""
-    log_pipeline_action("DYNAMIC REFRESH", "Starting unconditional dynamic data refresh")
+    """Refresh DYNAMIC data conditionally with immediate KML regeneration."""
+    log_pipeline_action("DYNAMIC REFRESH", "Starting dynamic data refresh")
 
     metadata = load_cache_metadata()
     dynamic_dir = RAW_SOURCE_DIR / "dynamic"
 
-    # Check age - allow some tolerance for testing (unconditional refresh every run for now)
+    # Check age - refresh only if older than 6 hours or missing, or force refresh
     dynamic_age_hours = get_cache_age(metadata.get('last_refresh_dynamic'), 'hours')
-    log_pipeline_action("DYNAMIC REFRESH", f"Age: {dynamic_age_hours:.1f} hours - unconditional refresh")
+    refresh_threshold_hours = float(os.environ.get('DYNAMIC_REFRESH_HOURS', '6'))
+    force_refresh = os.environ.get('FORCE_REFRESH', '').lower() in ('true', '1', 'yes')
+
+    if not force_refresh and dynamic_age_hours <= refresh_threshold_hours and dynamic_dir.exists() and any(dynamic_dir.rglob("*")):
+        log_pipeline_action("DYNAMIC REFRESH", f"Skipped - age {dynamic_age_hours:.1f} hours (threshold: {refresh_threshold_hours}h)")
+        return True  # Not an error, just no refresh needed
+
+    log_pipeline_action("DYNAMIC REFRESH", f"Refresh triggered - age {dynamic_age_hours:.1f} hours (threshold: {refresh_threshold_hours}h), force: {force_refresh}")
 
     # Create backup before downloading
     backup_dir = backup_directory(dynamic_dir, "dynamic_pre_download")
@@ -1416,11 +1424,36 @@ def refresh_caches():
 
     metadata = load_cache_metadata()
 
-    # Always refresh dynamic data (every 12 hours, unconditionally)
-    log_pipeline_action("PIPELINE", "Phase 1: Refreshing DYNAMIC data (unconditional)")
+    # Check if this is startup refresh and caches are fresh (early return for fast startup)
+    is_startup_refresh = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
+    if is_startup_refresh:
+        dynamic_age_hours = get_cache_age(metadata.get('last_refresh_dynamic'), 'hours')
+        static_age_days = get_cache_age(metadata.get('last_refresh_static'), 'days')
+        static_changed_flag = metadata.get('static_changed', False)
+
+        # Check if shapefiles exist for static data
+        static_dir = RAW_SOURCE_DIR / "static"
+        marineregions_dir = static_dir / "marineregions"
+        wdpa_dir = static_dir / "wdpa"
+        cables_dir = static_dir / "cables_global.geojson"
+        shapefiles_missing = (
+            not marineregions_dir.exists() or not any(marineregions_dir.glob("*.shp")) or
+            not wdpa_dir.exists() or not any(wdpa_dir.glob("*.zip")) or
+            not cables_dir.exists()
+        )
+
+        dynamic_fresh = dynamic_age_hours <= float(os.environ.get('DYNAMIC_REFRESH_HOURS', '6'))
+        static_fresh = static_age_days <= 30 and not static_changed_flag and not shapefiles_missing
+
+        if dynamic_fresh and static_fresh:
+            log_pipeline_action("PIPELINE", f"Caches recent (dynamic: {dynamic_age_hours:.1f}h, static: {static_age_days:.1f}d) - skipping full refresh")
+            return True
+
+    # Conditionally refresh dynamic data (every 6 hours OR force refresh)
+    log_pipeline_action("PIPELINE", "Phase 1: Refreshing DYNAMIC data (conditional)")
     dynamic_success = refresh_dynamic_data()
 
-    # Conditionally refresh static data (every 30 days OR change flag)
+    # Conditionally refresh static data (every 30 days OR change flag OR force refresh)
     log_pipeline_action("PIPELINE", "Phase 2: Checking STATIC data refresh conditions")
     static_success = refresh_static_data()
 
@@ -1640,11 +1673,13 @@ def start_download():
 
         country_dir = base_dir / "country" if country else None
         global_dir = base_dir / "global"
-        cache_dir = base_dir / "cache"
 
-        country_dir.mkdir(exist_ok=True)
+        # Use global cache directory for pre-generated files
+        cache_dir = Path(app.root_path).parent / "cache"
+
+        country_dir.mkdir(exist_ok=True) if country_dir else None
         global_dir.mkdir(exist_ok=True)
-        cache_dir.mkdir(exist_ok=True)
+        # Don't create cache_dir since we're using the global one
 
         # Set up progress tracking
         progress_queue = queue.Queue()

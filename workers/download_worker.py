@@ -216,13 +216,12 @@ def worker(
 
         # Check for pre-generated KMLs first (for default styles)
         if task.type in ("territorial", "contiguous", "eez", "ecs"):
-            # Country-specific layers
-            # Map task types to new KML naming conventions
+            # Country-specific layers - use the actual naming convention from pregenerate
             kml_name_map = {
-                'eez': f"{iso_code}_EEZ.kml",
-                'territorial_waters': f"{iso_code}_TTW.kml",
-                'contiguous_zone': f"{iso_code}_Contig.kml",
-                'ecs': f"{iso_code}_ECS.kml"
+                'eez': f"{iso_code}_eez.kml",
+                'territorial': f"{iso_code}_territorial_waters.kml",
+                'contiguous': f"{iso_code}_contiguous_zone.kml",
+                'ecs': f"{iso_code}_ecs.kml"
             }
             kml_filename = kml_name_map.get(task.type, f"{task.type}.kml")
             pregenerated_path = cache_path / "pregenerated_kml" / "country" / iso_code / kml_filename
@@ -236,8 +235,8 @@ def worker(
                 print(f"WORKER THREAD: No pre-generated {task.type} found for {iso_code}")
 
         elif task.type == "mpa":
-            # MPA layer
-            pregenerated_path = cache_path / "pregenerated_kml" / "country" / iso_code / f"{iso_code}_MPA.kml"
+            # MPA layer - use the actual naming convention from pregenerate
+            pregenerated_path = cache_path / "pregenerated_kml" / "country" / iso_code / f"{iso_code}_mpa.kml"
             if pregenerated_path.exists():
                 print(f"WORKER THREAD: Using pre-generated MPA for {iso_code}")
                 import shutil
