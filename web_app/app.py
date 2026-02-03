@@ -279,13 +279,13 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
             'kml_suffix': 'eez'
         },
         'territorial': {
-            'shp_pattern': 'territorial_seas*.shp',
+            'shp_pattern': 'eez_12nm*.shp',
             'color_hex': '#FFFF00',  # Yellow
             'opacity': 20,
             'kml_suffix': 'territorial_waters'
         },
         'contiguous': {
-            'shp_pattern': 'contiguous_zones*.shp',
+            'shp_pattern': 'eez_24nm*.shp',
             'color_hex': '#00FF00',  # Green
             'opacity': 20,
             'kml_suffix': 'contiguous_zone'
@@ -411,8 +411,51 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                         if temp_kml.exists():
                             temp_kml.unlink()
                     else:
-                        print(f"PREGENERATE: Failed to style {config['kml_suffix']} for {country_code}")
-                        # Clean up temp file on failure
+                        print(f"PREGENERATE: Failed to style {config['kml_suffix']} for {country_code}, using basic styling")
+                        # Fallback: create KML with basic styling
+                        try:
+                            with open(str(final_kml), 'w', encoding='utf-8') as f:
+                                f.write(f"""<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>{config['kml_suffix'].replace('_', ' ').title()} - {country_code}</name>
+    <Style id="defaultStyle">
+      <LineStyle>
+        <color>{color_abgr}</color>
+        <width>2</width>
+      </LineStyle>
+      <PolyStyle>
+        <color>{color_abgr.replace('ff', '40')}</color>
+        <fill>1</fill>
+        <outline>1</outline>
+      </PolyStyle>
+    </Style>""")
+
+                                # Add placemarks from the geopandas KML
+                                with open(str(temp_kml), 'r', encoding='utf-8') as temp_f:
+                                    temp_content = temp_f.read()
+                                    # Extract Placemark elements and add styleUrl
+                                    import re
+                                    placemark_pattern = r'(<Placemark>.*?</Placemark>)'
+                                    placemarks = re.findall(placemark_pattern, temp_content, re.DOTALL)
+
+                                    for placemark in placemarks:
+                                        # Add styleUrl if not present
+                                        if '<styleUrl>' not in placemark:
+                                            styled_placemark = placemark.replace('<Placemark>', '<Placemark>\n      <styleUrl>#defaultStyle</styleUrl>', 1)
+                                        else:
+                                            styled_placemark = placemark
+                                        f.write(f"    {styled_placemark}\n")
+
+                                f.write("""  </Document>
+</kml>""")
+
+                            country_layers += 1
+                            print(f"PREGENERATE: Generated {config['kml_suffix']} for {country_code} with fallback styling")
+                        except Exception as fallback_error:
+                            print(f"PREGENERATE: Fallback styling also failed for {country_code}: {fallback_error}")
+
+                        # Clean up temp file
                         if temp_kml.exists():
                             temp_kml.unlink()
 
@@ -436,6 +479,116 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
 
         # Skip the old layer-by-layer processing since we did per-country above
         return
+
+    # Process WDPA data for MPAs
+    wdpa_dir = STATIC_CACHE_DIR / "wdpa"
+    wdpa_files = list(wdpa_dir.glob("*.zip"))
+    if wdpa_files:
+        wdpa_file = wdpa_files[0]
+        print(f"PREGENERATE: Processing MPA data from {wdpa_file}")
+        mpa_gdf = None
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                print(f"PREGENERATE: Extracting WDPA ZIP to {temp_dir}")
+                with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
+                    zip_ref.extractall(temp_dir)
+
+                # Check for direct shapefiles
+                shp_files = list(Path(temp_dir).glob("*.shp"))
+                if not shp_files:
+                    # Prefer polygons shapefile over points
+                    polygons_shp = None
+                    for shp_file in shp_files:
+                        if 'polygons' in str(shp_file).lower():
+                            polygons_shp = shp_file
+                            break
+                    if not polygons_shp:
+                        polygons_shp = shp_files[0]  # fallback to first one
+
+                    print(f"PREGENERATE: Reading shapefile {polygons_shp}")
+                    mpa_gdf = gpd.read_file(polygons_shp)
+                    print(f"PREGENERATE: Loaded {len(mpa_gdf)} MPA features")
+                    print(f"PREGENERATE: MPA columns: {list(mpa_gdf.columns)}")
+                else:
+                    print("PREGENERATE: No shapefiles found in extracted ZIP")
+
+            # Generate country-specific MPA KMLs
+            if mpa_gdf is not None and any(col.lower() == 'iso3' for col in mpa_gdf.columns):
+                # Find the correct column name (case-insensitive)
+                iso3_col = next(col for col in mpa_gdf.columns if col.lower() == 'iso3')
+
+                mpa_countries = mpa_gdf[iso3_col].unique()
+                mpa_countries = [c for c in mpa_countries if c and not pd.isna(c)]
+                print(f"PREGENERATE: Found {len(mpa_countries)} countries with MPA data (using column '{iso3_col}')")
+
+                success_count = 0
+                for country_iso in mpa_countries:
+                    try:
+                        country_iso_dir = country_dir / str(country_iso)
+                        country_iso_dir.mkdir(exist_ok=True)
+
+                        country_mpa = mpa_gdf[mpa_gdf[iso3_col] == country_iso]
+                        if not country_mpa.empty:
+                            mpa_kml = country_iso_dir / f"{country_iso}_MPA.kml"
+                            temp_kml = country_iso_dir / f"{country_iso}_MPA_temp.kml"
+
+                            # Clean MPA data
+                            country_mpa = country_mpa[country_mpa.geometry.is_valid & ~country_mpa.geometry.is_empty]
+
+                            # Reduce columns to only essential ones for smaller/faster KML
+                            keep_columns = ['NAME_ENG', 'DESIG_ENG', 'IUCN_CAT', 'STATUS', 'STATUS_YR', 'geometry']
+                            available_columns = [col for col in keep_columns if col in country_mpa.columns]
+                            if available_columns:
+                                country_mpa = country_mpa[available_columns]
+
+                            # Add geometry simplification for smaller/faster files (0.005 degrees ~ 500m at equator)
+                            if len(country_mpa) > 10:  # Only simplify for larger datasets
+                                country_mpa = country_mpa.copy()
+                                country_mpa['geometry'] = country_mpa.geometry.simplify(0.005, preserve_topology=True)
+
+                            # Skip geometry simplification to avoid KeyboardInterrupt - keep original geometries
+                            import time
+                            start_time = time.time()
+
+                            try:
+                                # Create basic KML first (use default geopandas KML driver - no engine parameter)
+                                country_mpa.to_file(str(temp_kml), driver='KML')
+
+                                # Apply desktop MPA styling (red fill)
+                                mpa_color_abgr = "ff0000ff"  # Red with full opacity
+                                if process_kml(str(temp_kml), str(mpa_kml), mpa_color_abgr):
+                                    elapsed = time.time() - start_time
+                                    print(f"PREGENERATE: Generated MPA for {country_iso} ({len(country_mpa)} features) in {elapsed:.1f}s")
+                                    success_count += 1
+                                else:
+                                    print(f"PREGENERATE: Failed to style MPA for {country_iso}")
+
+                                # Clean up temp file
+                                if temp_kml.exists():
+                                    temp_kml.unlink()
+
+                            except Exception as kml_error:
+                                elapsed = time.time() - start_time
+                                print(f"PREGENERATE: Failed to generate MPA KML for {country_iso} after {elapsed:.1f}s: {kml_error}")
+                    except Exception as country_error:
+                        print(f"PREGENERATE: Error processing MPA country {country_iso}: {country_error}")
+                        continue
+
+                print(f"PREGENERATE: MPA processing complete - {success_count}/{len(mpa_countries)} countries succeeded")
+            else:
+                print("PREGENERATE: MPA data not loaded or missing iso3 column")
+
+            # Clean up MPA GeoDataFrame and force garbage collection
+            if 'mpa_gdf' in locals() and mpa_gdf is not None:
+                del mpa_gdf
+            gc.collect()
+
+        except Exception as e:
+            print(f"PREGENERATE: Error processing MPA data: {e}")
+            # Clean up on error too
+            if 'mpa_gdf' in locals() and mpa_gdf is not None:
+                del mpa_gdf
+            gc.collect()
 
     # Process WDPA data for MPAs
     wdpa_dir = STATIC_CACHE_DIR / "wdpa"
@@ -669,6 +822,42 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                 del mpa_gdf
             gc.collect()
 
+    # Process submarine cables (global)
+    cables_files = list(STATIC_CACHE_DIR.glob("cables_global.*"))
+    if cables_files:
+        cables_file = cables_files[0]
+        print(f"PREGENERATE: Processing submarine cables data from {cables_file}")
+        try:
+            cables_kml = global_dir / "sub_cables.kml"
+
+            # Use desktop process_line_kml with random colors (handles duplicates automatically)
+            default_color_hex = "#ffffff"  # White cables
+            default_opacity = "50"
+
+            if process_line_kml(str(cables_file), str(cables_kml), default_color_hex, default_opacity, use_random=True):
+                print(f"PREGENERATE: Generated submarine cables KML with desktop processing")
+            else:
+                print(f"PREGENERATE: Failed to generate submarine cables KML using desktop processing")
+
+        except Exception as e:
+            print(f"PREGENERATE: Error processing submarine cables data: {e}")
+
+    # Process ocean currents (global)
+    oscar_files = list(DYNAMIC_CACHE_DIR.glob("oscar_currents/*.nc"))
+    if oscar_files:
+        oscar_file = max(oscar_files, key=lambda x: x.stat().st_mtime)
+        print(f"PREGENERATE: Processing ocean currents from {oscar_file}")
+        try:
+            # Process global currents
+            currents_global_kml = global_dir / "ocean_currents_global.kml"
+            if process_currents(str(oscar_file), str(currents_global_kml), density=3.0, color="#000000", opacity=100):
+                print(f"PREGENERATE: Generated global ocean currents KML")
+            else:
+                print(f"PREGENERATE: Failed to generate global ocean currents KML")
+
+        except Exception as e:
+            print(f"PREGENERATE: Error processing ocean currents: {e}")
+
     # Process cables (global) - use desktop process_line_kml for proper styling
     cables_files = list(STATIC_CACHE_DIR.glob("cables_global.*"))
     if cables_files:
@@ -746,13 +935,17 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                     name = properties.get('title', f'NAV WARNING {i+1}')
                     description = properties.get('description', 'Navigation warning')
 
-                    # Format description with HTML
-                    html_desc = f"<b>{name}</b><br>"
-                    html_desc += f"<b>NAVAREA:</b> {properties.get('navarea', 'Unknown')}<br>"
+                    # Format description with HTML and escape for XML
+                    import html
+                    safe_name = html.escape(name)
+                    safe_description = html.escape(description.replace('\n', '<br>'))
+
+                    html_desc = f"<b>{safe_name}</b><br>"
+                    html_desc += f"<b>NAVAREA:</b> {html.escape(properties.get('navarea', 'Unknown'))}<br>"
                     if properties.get('msg_number') and properties.get('msg_year'):
-                        html_desc += f"<b>Warning:</b> {properties.get('msg_number')}/{properties.get('msg_year')}<br>"
-                    html_desc += f"<b>Source:</b> {properties.get('source', 'NGA MSI')}<br><br>"
-                    html_desc += description.replace('\n', '<br>')
+                        html_desc += f"<b>Warning:</b> {html.escape(str(properties.get('msg_number')))}/{html.escape(str(properties.get('msg_year')))}<br>"
+                    html_desc += f"<b>Source:</b> {html.escape(properties.get('source', 'NGA MSI'))}<br><br>"
+                    html_desc += safe_description
 
                     geom_type = geometry.get('type', '')
                     coordinates = geometry.get('coordinates', [])

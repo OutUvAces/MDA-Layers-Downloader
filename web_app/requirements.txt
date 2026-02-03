@@ -17,4 +17,5 @@ matplotlib>=3.7.0
 requests>=2.28.0
 simplekml>=0.3.3
 apscheduler>=3.10.0
+python-dotenv>=1.0.0
 gunicorn

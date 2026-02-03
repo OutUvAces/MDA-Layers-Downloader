@@ -720,6 +720,10 @@ def refresh_dynamic_caches():
     print("OSCAR: Refreshing dynamic cache...")
 
     try:
+        # Load environment variables from .env file if it exists
+        from dotenv import load_dotenv
+        load_dotenv()
+
         # Get NASA credentials from environment
         username = os.getenv('NASA_USERNAME')
         password = os.getenv('NASA_PASSWORD')
