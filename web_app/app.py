@@ -508,11 +508,11 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
 
     # Process WDPA data for MPAs (only if processing static layers)
     if process_static_layers:
-    wdpa_dir = STATIC_CACHE_DIR / "wdpa"
-    wdpa_files = list(wdpa_dir.glob("*.zip"))
-    if wdpa_files:
-        wdpa_file = wdpa_files[0]
-        print(f"PREGENERATE: Processing MPA data from {wdpa_file}")
+        wdpa_dir = STATIC_CACHE_DIR / "wdpa"
+        wdpa_files = list(wdpa_dir.glob("*.zip"))
+        if wdpa_files:
+            wdpa_file = wdpa_files[0]
+            print(f"PREGENERATE: Processing MPA data from {wdpa_file}")
         mpa_gdf = None
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
