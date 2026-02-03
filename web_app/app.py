@@ -363,43 +363,38 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
             start_time = time.time()
             processed_countries = 0
 
-                for country_code in all_countries:
-                    country_start = time.time()
-                    print(f"PREGENERATE: Processing MarineRegions for {country_code}...")
+            for country_code in all_countries:
+                country_start = time.time()
+                print(f"PREGENERATE: Processing MarineRegions for {country_code}...")
 
-                    country_layers = 0
-                    country_combined = None
+                country_layers = 0
+                country_combined = None
 
-                    # Process each layer for this country
-                    for layer_key, config in layer_configs.items():
-                        if layer_key not in layer_gdfs:
-                            continue
+                # Process each layer for this country
+                for layer_key, config in layer_configs.items():
+                    if layer_key not in layer_gdfs:
+                        continue
 
-                        gdf = layer_gdfs[layer_key]
-                        iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
-                        if not iso_col:
-                            continue
+                    gdf = layer_gdfs[layer_key]
+                    iso_col = 'iso_ter1' if 'iso_ter1' in gdf.columns else ('ISO_TERR1' if 'ISO_TERR1' in gdf.columns else None)
+                    if not iso_col:
+                        continue
 
-                        # Filter data for this country
-                        country_layer = gdf[gdf[iso_col] == country_code]
-                        if country_layer.empty:
-                            continue
+                    # Filter data for this country
+                    country_layer = gdf[gdf[iso_col] == country_code]
+                    if country_layer.empty:
+                        continue
 
-                        try:
-                            # Skip slow validity filtering for viz-only layers (make_valid will repair if needed)
-                            country_layer['geometry'] = country_layer['geometry'].make_valid()  # Keep make_valid for repairs
+                    try:
+                        # Skip slow validity filtering for viz-only layers (make_valid will repair if needed)
+                        country_layer['geometry'] = country_layer['geometry'].make_valid()  # Keep make_valid for repairs
 
-                            # Optional light simplify for performance
-                            if len(country_layer) > 5:  # Only for larger country datasets
-                                country_layer = country_layer.copy()
-                                country_layer['geometry'] = country_layer.geometry.simplify(0.001, preserve_topology=True)
-
-                            # Fix problematic fields (matching desktop)
-                            for col in country_layer.columns:
-                                if col in ['mrgid_sov1', 'mrgid_eez', 'mrgid_ter1', 'mrgid_sov2']:
-                                    country_layer[col] = country_layer[col].fillna(0).astype(int)
-                                elif country_layer[col].dtype == 'object':
-                                    country_layer[col] = country_layer[col].fillna('').astype(str)
+                        # Fix problematic fields (matching desktop)
+                        for col in country_layer.columns:
+                            if col in ['mrgid_sov1', 'mrgid_eez', 'mrgid_ter1', 'mrgid_sov2']:
+                                country_layer[col] = country_layer[col].fillna(0).astype(int)
+                            elif country_layer[col].dtype == 'object':
+                                country_layer[col] = country_layer[col].fillna('').astype(str)
 
                             # Create country directory
                             country_iso_dir = country_dir / str(country_code)
