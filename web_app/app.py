@@ -246,6 +246,15 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
     country_dir.mkdir(parents=True, exist_ok=True)
     global_dir.mkdir(parents=True, exist_ok=True)
 
+    # Determine if we should process static layers (MarineRegions, MPA, cables)
+    # Only process static layers if changed_layers is None (full regeneration) or contains static layer names
+    process_static_layers = (
+        changed_layers is None or
+        any(layer in ['marineregions', 'mpa', 'cables', 'eez', 'territorial', 'contiguous', 'ecs'] for layer in changed_layers)
+    )
+
+    print(f"PREGENERATE: Processing layers - static: {process_static_layers}, changed_layers: {changed_layers}")
+
     # Check if we can skip regeneration (for static data only)
     if not force_regeneration and changed_layers is not None:
         # Check if country KMLs exist
@@ -267,11 +276,12 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
         color_abgr = hex_to_kml_abgr(DEFAULT_COLORS[layer_type], int(DEFAULT_OPACITIES[layer_type]))
         default_styles[layer_type] = {'color_abgr': color_abgr}
 
-    # Load MarineRegions shapefiles and process like desktop version
-    marineregions_dir = STATIC_CACHE_DIR / "marineregions"
+    # Load MarineRegions shapefiles and process like desktop version (only if processing static layers)
+    if process_static_layers:
+        marineregions_dir = STATIC_CACHE_DIR / "marineregions"
 
-    # Define layer configurations matching desktop defaults (hard-coded)
-    layer_configs = {
+        # Define layer configurations matching desktop defaults (hard-coded)
+        layer_configs = {
         'eez': {
             'shp_pattern': 'eez*.shp',
             'color_hex': '#0000FF',  # Blue
@@ -496,7 +506,8 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
         # Skip the old layer-by-layer processing since we did per-country above
         return
 
-    # Process WDPA data for MPAs
+    # Process WDPA data for MPAs (only if processing static layers)
+    if process_static_layers:
     wdpa_dir = STATIC_CACHE_DIR / "wdpa"
     wdpa_files = list(wdpa_dir.glob("*.zip"))
     if wdpa_files:
@@ -943,27 +954,28 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                 del mpa_gdf
             gc.collect()
 
-    # Process submarine cables (global)
-    cables_files = list(STATIC_CACHE_DIR.glob("cables_global.*"))
-    if cables_files:
-        cables_file = cables_files[0]
-        print(f"PREGENERATE: Processing submarine cables data from {cables_file}")
-        try:
-            cables_kml = global_dir / "sub_cables.kml"
+    # Process submarine cables (global) - only if processing static layers
+    if process_static_layers:
+        cables_files = list(STATIC_CACHE_DIR.glob("cables_global.*"))
+        if cables_files:
+            cables_file = cables_files[0]
+            print(f"PREGENERATE: Processing submarine cables data from {cables_file}")
+            try:
+                cables_kml = global_dir / "sub_cables.kml"
 
-            # Use desktop process_line_kml with random colors (handles duplicates automatically)
-            default_color_hex = "#ffffff"  # White cables
-            default_opacity = "50"
+                # Use desktop process_line_kml with random colors (handles duplicates automatically)
+                default_color_hex = "#ffffff"  # White cables
+                default_opacity = "50"
 
-            if process_line_kml(str(cables_file), str(cables_kml), default_color_hex, default_opacity, use_random=True):
-                print(f"PREGENERATE: Generated submarine cables KML with desktop processing")
-            else:
-                print(f"PREGENERATE: Failed to generate submarine cables KML using desktop processing")
+                if process_line_kml(str(cables_file), str(cables_kml), default_color_hex, default_opacity, use_random=True):
+                    print(f"PREGENERATE: Generated submarine cables KML with desktop processing")
+                else:
+                    print(f"PREGENERATE: Failed to generate submarine cables KML using desktop processing")
 
-        except Exception as e:
-            print(f"PREGENERATE: Error processing submarine cables data: {e}")
+            except Exception as e:
+                print(f"PREGENERATE: Error processing submarine cables data: {e}")
 
-    # Process ocean currents (global) - skip if OSCAR credentials not available
+    # Process ocean currents (global) - only for dynamic layers
     oscar_files = list(DYNAMIC_CACHE_DIR.glob("oscar_currents/*.nc"))
     if oscar_files:
         oscar_file = max(oscar_files, key=lambda x: x.stat().st_mtime)

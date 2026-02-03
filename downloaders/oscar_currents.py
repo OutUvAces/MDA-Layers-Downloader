@@ -723,7 +723,10 @@ def refresh_dynamic_caches():
         # Load environment variables from .env file if it exists
         try:
             from dotenv import load_dotenv
-            load_dotenv()
+            # Load .env from project root (parent of web_app)
+            project_root = Path(__file__).parent.parent
+            env_path = project_root / '.env'
+            load_dotenv(env_path)
         except ImportError:
             print("OSCAR: python-dotenv not installed — install via: pip install python-dotenv")
 
