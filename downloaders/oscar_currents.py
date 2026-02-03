@@ -723,16 +723,32 @@ def refresh_dynamic_caches():
         # Load environment variables from .env file if it exists
         try:
             from dotenv import load_dotenv
-            # Load .env from project root (parent of web_app)
-            project_root = Path(__file__).parent.parent
-            env_path = project_root / '.env'
-            load_dotenv(env_path)
+            # Try multiple possible locations for .env file
+            env_paths = [
+                Path(__file__).parent.parent / '.env',  # downloaders/../.env
+                Path.cwd() / '.env',  # Current working directory
+                Path.home() / '.env',  # Home directory (fallback)
+            ]
+
+            env_loaded = False
+            for env_path in env_paths:
+                print(f"OSCAR: Trying .env at: {env_path}")
+                if env_path.exists():
+                    result = load_dotenv(env_path)
+                    print(f"OSCAR: Loaded .env from {env_path}, result: {result}")
+                    env_loaded = True
+                    break
+
+            if not env_loaded:
+                print("OSCAR: No .env file found in any expected location")
+
         except ImportError:
             print("OSCAR: python-dotenv not installed — install via: pip install python-dotenv")
 
         # Get NASA credentials from environment
         username = os.getenv('NASA_USERNAME')
         password = os.getenv('NASA_PASSWORD')
+        print(f"OSCAR: Found username: {bool(username)}, password: {bool(password)}")
 
         if not username or not password:
             print("OSCAR: NASA_USERNAME and NASA_PASSWORD environment variables not set")
