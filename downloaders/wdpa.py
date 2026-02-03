@@ -228,9 +228,34 @@ def download_and_extract_wdpa_shp_zip(cache_dir: str, task: LayerTask, report_pr
                     report_progress(0, "Downloading latest ZIP...")
                     response = requests.get(zip_url, stream=True, timeout=60)
                     response.raise_for_status()
-                    with open(zip_path, 'wb') as f:
-                        for chunk in response.iter_content(chunk_size=8192):
-                            f.write(chunk)
+
+                    # Get total size for progress feedback
+                    total_size = int(response.headers.get('Content-Length', 0))
+
+                    try:
+                        from tqdm import tqdm
+                        use_tqdm = True
+                    except ImportError:
+                        use_tqdm = False
+
+                    if use_tqdm:
+                        with open(zip_path, 'wb') as f, tqdm(
+                            desc="Downloading WDPA marine shapefile ZIP",
+                            total=total_size,
+                            unit='B',
+                            unit_scale=True,
+                            unit_divisor=1024,
+                            colour='blue'
+                        ) as pbar:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                if chunk:
+                                    f.write(chunk)
+                                    pbar.update(len(chunk))
+                    else:
+                        with open(zip_path, 'wb') as f:
+                            for chunk in response.iter_content(chunk_size=8192):
+                                if chunk:
+                                    f.write(chunk)
                     report_progress(task.weight * 0.08)
                 latest_zip_path = zip_path
                 break  # Found latest, stop loop

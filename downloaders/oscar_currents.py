@@ -85,9 +85,32 @@ async def download_oscar_granule_async(session, granule_url: str, temp_nc: str, 
             raise Exception("Token expired - sync fallback needed for token refresh")
 
         response.raise_for_status()
-        with open(temp_nc, 'wb') as f:
-            async for chunk in response.content.iter_chunked(8192):
-                f.write(chunk)
+
+        # Get total size for progress feedback
+        total_size = int(response.headers.get('Content-Length', 0))
+
+        try:
+            from tqdm import tqdm
+            use_tqdm = True
+        except ImportError:
+            use_tqdm = False
+
+        if use_tqdm:
+            with open(temp_nc, 'wb') as f, tqdm(
+                desc="Downloading OSCAR ocean currents .nc",
+                total=total_size,
+                unit='B',
+                unit_scale=True,
+                unit_divisor=1024,
+                colour='cyan'
+            ) as pbar:
+                async for chunk in response.content.iter_chunked(8192):
+                    f.write(chunk)
+                    pbar.update(len(chunk))
+        else:
+            with open(temp_nc, 'wb') as f:
+                async for chunk in response.content.iter_chunked(8192):
+                    f.write(chunk)
 
 async def process_async(session, task: LayerTask, report_progress, output_dir: str, cache_dir: str, username: str, password: str) -> bool:
     """Async version of OSCAR processing"""
@@ -705,9 +728,34 @@ def process(task: LayerTask, report_progress, output_dir: str, cache_dir: str, u
                     r = requests.get(granule_url, headers=headers, stream=True, timeout=120)
 
                 r.raise_for_status()
-                with open(temp_nc, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192):
-                        f.write(chunk)
+
+                # Get total size for progress feedback
+                total_size = int(r.headers.get('Content-Length', 0))
+
+                try:
+                    from tqdm import tqdm
+                    use_tqdm = True
+                except ImportError:
+                    use_tqdm = False
+
+                if use_tqdm:
+                    with open(temp_nc, 'wb') as f, tqdm(
+                        desc="Downloading OSCAR ocean currents .nc",
+                        total=total_size,
+                        unit='B',
+                        unit_scale=True,
+                        unit_divisor=1024,
+                        colour='cyan'
+                    ) as pbar:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                                pbar.update(len(chunk))
+                else:
+                    with open(temp_nc, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
 
         return process_oscar_core(task, report_progress, output_dir, cache_dir, temp_nc, latest_date)
 
@@ -834,9 +882,33 @@ def refresh_dynamic_caches():
 
                 response.raise_for_status()
 
-                with open(cache_file, 'wb') as f:
-                    for chunk in response.iter_content(chunk_size=8192):
-                        f.write(chunk)
+                # Get total size for progress feedback
+                total_size = int(response.headers.get('Content-Length', 0))
+
+                try:
+                    from tqdm import tqdm
+                    use_tqdm = True
+                except ImportError:
+                    use_tqdm = False
+
+                if use_tqdm:
+                    with open(cache_file, 'wb') as f, tqdm(
+                        desc="Downloading OSCAR ocean currents .nc",
+                        total=total_size,
+                        unit='B',
+                        unit_scale=True,
+                        unit_divisor=1024,
+                        colour='cyan'
+                    ) as pbar:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                                pbar.update(len(chunk))
+                else:
+                    with open(cache_file, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
 
                 print(f"OSCAR: Downloaded OSCAR data, size = {cache_file.stat().st_size} bytes")
                 print("OSCAR: Dynamic cache refreshed successfully")
