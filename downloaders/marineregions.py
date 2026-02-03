@@ -217,32 +217,54 @@ def refresh_static_caches():
                         print(f"MARINEREGIONS: Got response for {layer_info['description']}, status: {response.status_code}")
                         response.raise_for_status()
 
-                        # Download content in chunks to avoid memory issues
-                        print(f"MARINEREGIONS: Downloading content for {layer_info['description']}...")
-                        content = b''
-                        downloaded_size = 0
-                        for chunk in response.iter_content(chunk_size=8192):
-                            if chunk:
-                                content += chunk
-                                downloaded_size += len(chunk)
-                                if downloaded_size > 100 * 1024 * 1024:  # 100MB limit (increased for large shapefiles)
-                                    print(f"MARINEREGIONS: Download too large ({downloaded_size} bytes), aborting")
-                                    response.close()
-                                    continue
+                        # Get total size for progress feedback
+                        total_size = int(response.headers.get('Content-Length', 0))
 
-                        print(f"MARINEREGIONS: Downloaded {len(content)} bytes for {layer_info['description']}")
+                        # Download content in chunks with progress feedback
+                        print(f"MARINEREGIONS: Downloading content for {layer_info['description']}...")
+                        try:
+                            from tqdm import tqdm
+                            with open(zip_path, 'wb') as f, tqdm(
+                                desc=f"Downloading {layer_info['description']}",
+                                total=total_size,
+                                unit='B',
+                                unit_scale=True,
+                                ncols=80
+                            ) as pbar:
+                                downloaded_size = 0
+                                for chunk in response.iter_content(chunk_size=8192):
+                                    if chunk:
+                                        f.write(chunk)
+                                        downloaded_size += len(chunk)
+                                        pbar.update(len(chunk))
+                        except ImportError:
+                            # Fallback without progress bar if tqdm not available
+                            print(f"MARINEREGIONS: Downloading {layer_info['description']} without progress (install tqdm for progress bars)...")
+                            with open(zip_path, 'wb') as f:
+                                for chunk in response.iter_content(chunk_size=8192):
+                                    if chunk:
+                                        f.write(chunk)
+
                         response.close()
 
-                        # Validate that we actually downloaded a ZIP file
-                        if not content.startswith(b'PK\x03\x04'):
-                            print(f"MARINEREGIONS: ERROR - Downloaded file is not a ZIP (starts with {content[:20]})")
-                            print(f"MARINEREGIONS: Skipping {layer_info['description']} - no shapefile data available")
+                        # Validate download
+                        if not zip_path.exists() or zip_path.stat().st_size == 0:
+                            print(f"MARINEREGIONS: ERROR - Downloaded file is empty")
+                            print(f"MARINEREGIONS: Skipping {layer_info['description']} - no data downloaded")
+                            if zip_path.exists():
+                                zip_path.unlink()
                             continue
 
-                        with open(zip_path, 'wb') as f:
-                            f.write(content)
+                        # Validate that we actually downloaded a ZIP file
+                        with open(zip_path, 'rb') as f:
+                            header = f.read(20)
+                            if not header.startswith(b'PK\x03\x04'):
+                                print(f"MARINEREGIONS: ERROR - Downloaded file is not a ZIP (starts with {header})")
+                                print(f"MARINEREGIONS: Skipping {layer_info['description']} - no shapefile data available")
+                                zip_path.unlink()
+                                continue
 
-                        print(f"MARINEREGIONS: Downloaded {layer_info['description']}, size = {zip_path.stat().st_size} bytes")
+                        print(f"MARINEREGIONS: Downloaded {layer_info['description']}, size = {zip_path.stat().st_size:,} bytes")
 
                     except requests.exceptions.Timeout:
                         print(f"MARINEREGIONS: Timeout downloading {layer_info['description']} - server not responding within 30s")
