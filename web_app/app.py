@@ -1877,24 +1877,18 @@ def download(task_id, path_type):
 
     return send_file(zip_path, as_attachment=True, download_name=f'{task_id}_{path_type}.zip')
 
-# Global flag to ensure cache refresh runs only once on first request
-_cache_refresh_done = False
-
-@app.before_request
-def startup_refresh():
-    """Run initial cache refresh synchronously on first request (blocks until complete)"""
-    global _cache_refresh_done
-
-    if not _cache_refresh_done:
-        print("APP STARTUP: Running initial full cache refresh synchronously (this may take 5-10 minutes on first load)...")
-        refresh_caches()
-        _cache_refresh_done = True
-        print("APP STARTUP: Cache refresh completed - Flask app ready for requests")
 
 if __name__ == '__main__':
     # Only run Flask app if all required modules are available
     try:
         from flask import Flask
+
+        # Run cache refresh in worker process only (not reloader parent)
+        if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+            print("APP STARTUP: Running initial full cache refresh in worker process...")
+            refresh_caches()
+            print("APP STARTUP: Cache refresh completed - worker ready for requests")
+
         app.run(debug=True, host='0.0.0.0', port=5000)
     except ImportError as e:
         print(f"Flask not available, skipping web server: {e}")
