@@ -963,21 +963,12 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
         except Exception as e:
             print(f"PREGENERATE: Error processing submarine cables data: {e}")
 
-    # Process ocean currents (global)
+    # Process ocean currents (global) - skip if OSCAR credentials not available
     oscar_files = list(DYNAMIC_CACHE_DIR.glob("oscar_currents/*.nc"))
     if oscar_files:
         oscar_file = max(oscar_files, key=lambda x: x.stat().st_mtime)
-        print(f"PREGENERATE: Processing ocean currents from {oscar_file}")
-        try:
-            # Process global currents
-            currents_global_kml = global_dir / "ocean_currents_global.kml"
-            if process_currents(str(oscar_file), str(currents_global_kml), density=3.0, color="#000000", opacity=100):
-                print(f"PREGENERATE: Generated global ocean currents KML")
-            else:
-                print(f"PREGENERATE: Failed to generate global ocean currents KML")
-
-        except Exception as e:
-            print(f"PREGENERATE: Error processing ocean currents: {e}")
+        print(f"PREGENERATE: Found ocean currents data at {oscar_file} - skipping KML generation (requires OSCAR credentials)")
+        print(f"PREGENERATE: Ocean currents processing will be available when NASA credentials are configured")
 
     # Process cables (global) - use desktop process_line_kml for proper styling
     cables_files = list(STATIC_CACHE_DIR.glob("cables_global.*"))
@@ -1519,9 +1510,7 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(refresh_caches, 'interval', hours=12, id='cache_refresh')
 scheduler.start()
 
-# Force initial cache refresh on startup
-print("APP STARTUP: Checking cache status...")
-refresh_caches()
+# Cache refresh will be triggered on first request (see @app.before_first_request below)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -1548,6 +1537,12 @@ def run_download_task(task_id, settings, country_path, global_path, cache_path, 
 
     except Exception as e:
         progress_queue.put({"type": "error", "content": f"Task failed: {str(e)}"})
+
+@app.before_first_request
+def startup_refresh():
+    """Run initial cache refresh on first HTTP request"""
+    print("APP STARTUP: Running initial cache refresh on first request...")
+    refresh_caches()
 
 @app.route('/')
 def index():
