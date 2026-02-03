@@ -1330,7 +1330,6 @@ def fix_duplicate_kml_ids(kml_path: Path):
 
 def refresh_static_data():
     """Refresh STATIC data with granular change detection and conditional KML regeneration."""
-    print("DEBUG: refresh_static_data called")
     log_pipeline_action("STATIC REFRESH", "Starting static data refresh")
 
     metadata = load_cache_metadata()
@@ -1350,11 +1349,6 @@ def refresh_static_data():
         not wdpa_dir.exists() or not any(wdpa_dir.glob("*.zip")) or
         not cables_dir.exists()
     )
-
-    print(f"DEBUG: static_age_days={static_age_days}, static_changed_flag={static_changed_flag}, shapefiles_missing={shapefiles_missing}")
-    print(f"DEBUG: marineregions_dir.exists()={marineregions_dir.exists()}")
-    print(f"DEBUG: wdpa_dir.exists()={wdpa_dir.exists()}")
-    print(f"DEBUG: cables_dir.exists()={cables_dir.exists()}")
 
     if static_age_days <= 30 and not static_changed_flag and not shapefiles_missing:
         log_pipeline_action("STATIC REFRESH", f"Skipped - age {static_age_days:.1f} days, no change flag, shapefiles exist")
