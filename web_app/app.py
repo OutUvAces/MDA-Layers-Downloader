@@ -443,8 +443,8 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
         # Skip the old layer-by-layer processing since we did per-country above
         return
 
-    # Process WDPA data for MPAs (only if processing static layers)
-    if process_static_layers:
+    # Process WDPA data for MPAs (only if processing static layers or WDPA specifically changed)
+    if process_static_layers or ('wdpa' in (changed_layers or [])):
         wdpa_dir = STATIC_CACHE_DIR / "wdpa"
         wdpa_files = list(wdpa_dir.glob("*.zip"))
         if wdpa_files:
@@ -474,10 +474,6 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                                     continue
                                 try:
                                     with zipfile.ZipFile(zip_path, 'r') as z:
-                                        bad_file = z.testzip()
-                                        if bad_file:
-                                            print(f"PREGENERATE: Skipping corrupted ZIP: {file}")
-                                            continue
                                         z.extractall(temp_dir)
                                         force_extracted_count += 1
                                         extracted_zips.add(zip_path)
@@ -619,10 +615,6 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                                     continue
                                 try:
                                     with zipfile.ZipFile(zip_path, 'r') as z:
-                                        bad_file = z.testzip()
-                                        if bad_file:
-                                            print(f"PREGENERATE: Skipping corrupted ZIP: {file}")
-                                            continue
                                         z.extractall(temp_dir)
                                         force_extracted_count += 1
                                         extracted_zips.add(zip_path)
@@ -764,10 +756,6 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                                     continue
                                 try:
                                     with zipfile.ZipFile(zip_path, 'r') as z:
-                                        bad_file = z.testzip()
-                                        if bad_file:
-                                            print(f"PREGENERATE: Skipping corrupted ZIP: {file}")
-                                            continue
                                         z.extractall(temp_dir)
                                         force_extracted_count += 1
                                         extracted_zips.add(zip_path)
@@ -1252,12 +1240,16 @@ def refresh_static_data():
     """Refresh STATIC data with granular change detection and conditional KML regeneration."""
     log_pipeline_action("STATIC REFRESH", "Starting static data refresh")
 
-    metadata = load_cache_metadata()
     static_dir = RAW_SOURCE_DIR / "static"
 
-    # Check if refresh is needed (30 days OR manual flag OR missing shapefiles OR force refresh)
-    static_age_days = get_cache_age(metadata.get('last_refresh_static'), 'days')
-    static_changed_flag = metadata.get('static_changed', False)
+    # Check age using timestamp file
+    timestamp_path = os.path.join(static_dir, '.last_refresh_static')
+    if os.path.exists(timestamp_path):
+        last_time = float(open(timestamp_path).read().strip())
+        age_days = (time.time() - last_time) / (3600 * 24)  # Convert to days
+    else:
+        age_days = float('inf')
+
     force_refresh = os.environ.get('FORCE_REFRESH', '').lower() in ('true', '1', 'yes')
 
     # Also check if shapefiles actually exist
@@ -1271,11 +1263,11 @@ def refresh_static_data():
         not cables_dir.exists()
     )
 
-    if not force_refresh and static_age_days <= 30 and not static_changed_flag and not shapefiles_missing:
-        log_pipeline_action("STATIC REFRESH", f"Skipped - age {static_age_days:.1f} days, no change flag, shapefiles exist")
+    if not force_refresh and age_days <= 30 and not shapefiles_missing:
+        log_pipeline_action("STATIC REFRESH", f"Skipped - age {age_days:.1f}d <= 30d threshold, shapefiles exist")
         return True  # Not an error, just no refresh needed
 
-    log_pipeline_action("STATIC REFRESH", f"Refresh triggered - age {static_age_days:.1f} days, change flag: {static_changed_flag}")
+    log_pipeline_action("STATIC REFRESH", f"Refresh triggered - age {age_days:.1f}d > 30d threshold, force: {force_refresh}")
 
     # Get old layer hashes for comparison
     old_layer_hashes = metadata.get('static_layers', {})
@@ -1341,14 +1333,16 @@ def refresh_static_data():
         else:
             log_pipeline_action("STATIC REFRESH", "No changes detected and KMLs exist - skipping regeneration")
 
-        # Update metadata with new hashes and timestamp
+        # Update metadata with new hashes (keep for layer tracking)
         metadata['static_layers'] = new_layer_hashes
-        metadata['last_refresh_static'] = datetime.now()
         metadata['static_changed'] = False  # Reset flag
-
-        # Success: delete backup and save metadata
-        safe_delete_backup(backup_dir)
         save_cache_metadata(metadata)
+
+        # Success: delete backup and save timestamp
+        safe_delete_backup(backup_dir)
+        timestamp_path = os.path.join(static_dir, '.last_refresh_static')
+        with open(timestamp_path, 'w') as f:
+            f.write(str(time.time()))
         log_pipeline_action("STATIC REFRESH", "Completed successfully")
         return True
 
@@ -1358,19 +1352,24 @@ def refresh_dynamic_data():
     """Refresh DYNAMIC data conditionally with immediate KML regeneration."""
     log_pipeline_action("DYNAMIC REFRESH", "Starting dynamic data refresh")
 
-    metadata = load_cache_metadata()
     dynamic_dir = RAW_SOURCE_DIR / "dynamic"
 
-    # Check age - refresh only if older than 12 hours or missing, or force refresh
-    dynamic_age_hours = get_cache_age(metadata.get('last_refresh_dynamic'), 'hours')
-    refresh_threshold_hours = 12  # 12 hours for dynamic data (was 6)
+    # Check age using timestamp file
+    timestamp_path = os.path.join(dynamic_dir, '.last_refresh_dynamic')
+    if os.path.exists(timestamp_path):
+        last_time = float(open(timestamp_path).read().strip())
+        age_hours = (time.time() - last_time) / 3600
+    else:
+        age_hours = float('inf')
+
+    refresh_threshold_hours = 12  # 12 hours for dynamic data
     force_refresh = os.environ.get('FORCE_REFRESH', '').lower() in ('true', '1', 'yes')
 
-    if not force_refresh and dynamic_age_hours <= refresh_threshold_hours and dynamic_dir.exists() and any(dynamic_dir.rglob("*")):
-        log_pipeline_action("DYNAMIC REFRESH", f"Skipped - age {dynamic_age_hours:.1f} hours (threshold: {refresh_threshold_hours}h)")
+    if not force_refresh and age_hours <= refresh_threshold_hours and dynamic_dir.exists() and any(dynamic_dir.rglob("*")):
+        log_pipeline_action("DYNAMIC REFRESH", f"Skipped - age {age_hours:.1f}h <= {refresh_threshold_hours}h threshold")
         return True  # Not an error, just no refresh needed
 
-    log_pipeline_action("DYNAMIC REFRESH", f"Refresh triggered - age {dynamic_age_hours:.1f} hours (threshold: {refresh_threshold_hours}h), force: {force_refresh}")
+    log_pipeline_action("DYNAMIC REFRESH", f"Refresh triggered - age {age_hours:.1f}h > {refresh_threshold_hours}h threshold, force: {force_refresh}")
 
     # Create backup before downloading
     backup_dir = backup_directory(dynamic_dir, "dynamic_pre_download")
@@ -1409,10 +1408,11 @@ def refresh_dynamic_data():
             log_pipeline_action("DYNAMIC REFRESH", f"KML regeneration failed: {e}")
             return False
 
-        # Success: delete backup and update metadata
+        # Success: delete backup and save timestamp
         safe_delete_backup(backup_dir)
-        metadata['last_refresh_dynamic'] = datetime.now()
-        save_cache_metadata(metadata)
+        timestamp_path = os.path.join(dynamic_dir, '.last_refresh_dynamic')
+        with open(timestamp_path, 'w') as f:
+            f.write(str(time.time()))
         log_pipeline_action("DYNAMIC REFRESH", "Completed successfully")
         return True
 
@@ -1427,12 +1427,25 @@ def refresh_caches():
     # Check if this is startup refresh and caches are fresh (early return for fast startup)
     is_startup_refresh = os.environ.get('WERKZEUG_RUN_MAIN') == 'true'
     if is_startup_refresh:
-        dynamic_age_hours = get_cache_age(metadata.get('last_refresh_dynamic'), 'hours')
-        static_age_days = get_cache_age(metadata.get('last_refresh_static'), 'days')
-        static_changed_flag = metadata.get('static_changed', False)
+        # Check dynamic age using timestamp file
+        dynamic_dir = RAW_SOURCE_DIR / "dynamic"
+        timestamp_path = os.path.join(dynamic_dir, '.last_refresh_dynamic')
+        if os.path.exists(timestamp_path):
+            last_time = float(open(timestamp_path).read().strip())
+            dynamic_age_hours = (time.time() - last_time) / 3600
+        else:
+            dynamic_age_hours = float('inf')
+
+        # Check static age using timestamp file
+        static_dir = RAW_SOURCE_DIR / "static"
+        timestamp_path = os.path.join(static_dir, '.last_refresh_static')
+        if os.path.exists(timestamp_path):
+            last_time = float(open(timestamp_path).read().strip())
+            static_age_days = (time.time() - last_time) / (3600 * 24)
+        else:
+            static_age_days = float('inf')
 
         # Check if shapefiles exist for static data
-        static_dir = RAW_SOURCE_DIR / "static"
         marineregions_dir = static_dir / "marineregions"
         wdpa_dir = static_dir / "wdpa"
         cables_dir = static_dir / "cables_global.geojson"
@@ -1442,8 +1455,8 @@ def refresh_caches():
             not cables_dir.exists()
         )
 
-        dynamic_fresh = dynamic_age_hours <= float(os.environ.get('DYNAMIC_REFRESH_HOURS', '6'))
-        static_fresh = static_age_days <= 30 and not static_changed_flag and not shapefiles_missing
+        dynamic_fresh = dynamic_age_hours <= 12
+        static_fresh = static_age_days <= 30 and not shapefiles_missing
 
         if dynamic_fresh and static_fresh:
             log_pipeline_action("PIPELINE", f"Caches recent (dynamic: {dynamic_age_hours:.1f}h, static: {static_age_days:.1f}d) - skipping full refresh")
