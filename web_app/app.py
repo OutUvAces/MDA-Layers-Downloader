@@ -1522,7 +1522,7 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(refresh_caches, 'interval', hours=12, id='cache_refresh')
 scheduler.start()
 
-# Cache refresh will be triggered on first request (see @app.before_request below)
+# Cache refresh will be triggered on app startup (see signal handler below)
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -1550,20 +1550,7 @@ def run_download_task(task_id, settings, country_path, global_path, cache_path, 
     except Exception as e:
         progress_queue.put({"type": "error", "content": f"Task failed: {str(e)}"})
 
-# Flag to ensure cache refresh runs only once
-_cache_refresh_done = False
-_cache_refresh_thread = None
-
-@app.before_request
-def startup_refresh():
-    """Run initial cache refresh on first HTTP request"""
-    global _cache_refresh_done, _cache_refresh_thread
-    if not _cache_refresh_done and _cache_refresh_thread is None:
-        print("APP STARTUP: Starting initial cache refresh in background...")
-        import threading
-        _cache_refresh_thread = threading.Thread(target=refresh_caches, daemon=True)
-        _cache_refresh_thread.start()
-        _cache_refresh_done = True
+# Cache refresh will run after app startup in background thread
 
 @app.route('/')
 def index():
@@ -1929,6 +1916,12 @@ if __name__ == '__main__':
         print("APP STARTUP: Cache initialization completed and marked as done")
     else:
         print("APP STARTUP: Cache already initialized - skipping setup")
+
+    # Start cache refresh in background before starting Flask app
+    print("APP STARTUP: Starting initial cache refresh in background...")
+    import threading
+    cache_thread = threading.Thread(target=refresh_caches, daemon=True)
+    cache_thread.start()
 
     # Only run Flask app if all required modules are available
     try:
