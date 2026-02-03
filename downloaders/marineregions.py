@@ -210,8 +210,45 @@ def refresh_static_caches():
                         'Referer': 'https://www.marineregions.org/',
                     }
 
-                    response = requests.get(layer_info['url'], timeout=120, verify=False, headers=headers)
-                    response.raise_for_status()
+                    try:
+                        print(f"MARINEREGIONS: Starting download request for {layer_info['description']}...")
+                        # Use shorter timeout and add connection timeout
+                        response = requests.get(layer_info['url'], timeout=(10, 30), verify=False, headers=headers, stream=True)
+                        print(f"MARINEREGIONS: Got response for {layer_info['description']}, status: {response.status_code}")
+                        response.raise_for_status()
+
+                        # Download content in chunks to avoid memory issues
+                        print(f"MARINEREGIONS: Downloading content for {layer_info['description']}...")
+                        content = b''
+                        downloaded_size = 0
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                content += chunk
+                                downloaded_size += len(chunk)
+                                if downloaded_size > 50 * 1024 * 1024:  # 50MB limit
+                                    print(f"MARINEREGIONS: Download too large ({downloaded_size} bytes), aborting")
+                                    response.close()
+                                    continue
+
+                        print(f"MARINEREGIONS: Downloaded {len(content)} bytes for {layer_info['description']}")
+                        response.close()
+
+                    except requests.exceptions.Timeout:
+                        print(f"MARINEREGIONS: Timeout downloading {layer_info['description']} - server not responding within 30s")
+                        print(f"MARINEREGIONS: Skipping {layer_info['description']} - will use cached data if available")
+                        continue
+                    except requests.exceptions.ConnectionError as ce:
+                        print(f"MARINEREGIONS: Connection error downloading {layer_info['description']}: {ce}")
+                        print(f"MARINEREGIONS: Skipping {layer_info['description']} - network connectivity issue")
+                        continue
+                    except requests.exceptions.RequestException as re:
+                        print(f"MARINEREGIONS: Request error downloading {layer_info['description']}: {re}")
+                        print(f"MARINEREGIONS: Skipping {layer_info['description']} - HTTP error")
+                        continue
+                    except Exception as e:
+                        print(f"MARINEREGIONS: Unexpected error downloading {layer_info['description']}: {e}")
+                        print(f"MARINEREGIONS: Skipping {layer_info['description']} - unexpected error")
+                        continue
 
                     content = response.content
 
