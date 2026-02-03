@@ -410,20 +410,19 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                     temp_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}_temp.kml"
                     final_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}.kml"
 
-                    # Optimize for faster KML generation (reduce columns and simplify geometry aggressively)
-                    # Keep only minimal essential columns to reduce file size and processing time
-                    essential_cols = ['geometry']
-                    # Only keep ISO code for reference, skip territory name to reduce processing
-                    if 'iso_ter1' in country_layer.columns:
-                        essential_cols.append('iso_ter1')
-                    elif 'ISO_TERR1' in country_layer.columns:
-                        essential_cols.append('ISO_TERR1')
+                    # Drop all attributes for visualization-only layers (users don't need popups/details)
+                    # Keep only geometry for clean, fast KML generation
+                    country_layer = gpd.GeoDataFrame(geometry=country_layer.geometry, crs=country_layer.crs)
 
-                    country_layer = country_layer[essential_cols].copy()
+                    # Optional: dissolve multiple features into single feature per country (cleaner KML)
+                    if len(country_layer) > 1:
+                        country_layer = gpd.GeoDataFrame(geometry=[country_layer.unary_union], crs=country_layer.crs)
 
-                    # Aggressive geometry simplification for faster processing and smaller files
-                    # Use 0.005 degrees (~500m) tolerance - good balance of detail vs speed for large countries
-                    country_layer['geometry'] = country_layer.geometry.simplify(0.005, preserve_topology=True)
+                    # Conservative simplification matching main branch (preserve topology and detail)
+                    # Use 0.001 degrees (~100m) tolerance - keeps islands/coasts while reducing vertices
+                    country_layer['geometry'] = country_layer.geometry.simplify(tolerance=0.001, preserve_topology=True)
+
+                    print(f"PREGENERATE: Writing simplified viz-only KML for {country_code} ({layer_count} layers)...")
 
                     # Convert to KML using geopandas
                     country_layer.to_file(str(temp_kml), driver='KML')
