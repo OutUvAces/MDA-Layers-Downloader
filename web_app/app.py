@@ -1318,6 +1318,7 @@ def fix_duplicate_kml_ids(kml_path: Path):
 
 def refresh_static_data():
     """Refresh STATIC data with granular change detection and conditional KML regeneration."""
+    print("DEBUG: refresh_static_data called")
     log_pipeline_action("STATIC REFRESH", "Starting static data refresh")
 
     metadata = load_cache_metadata()
