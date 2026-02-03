@@ -400,6 +400,22 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                     temp_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}_temp.kml"
                     final_kml = country_iso_dir / f"{country_code}_{config['kml_suffix']}.kml"
 
+                    # Optimize for faster KML generation (reduce columns and simplify geometry)
+                    # Keep only essential columns to reduce file size and processing time
+                    essential_cols = ['geometry']
+                    if 'iso_ter1' in country_layer.columns:
+                        essential_cols.append('iso_ter1')
+                    elif 'ISO_TERR1' in country_layer.columns:
+                        essential_cols.append('ISO_TERR1')
+                    if 'TERRITORY1' in country_layer.columns:
+                        essential_cols.append('TERRITORY1')
+
+                    country_layer = country_layer[essential_cols].copy()
+
+                    # Simplify geometry for faster processing and smaller files
+                    # Use 0.001 degrees (~100m) tolerance for reasonable detail without excessive size
+                    country_layer['geometry'] = country_layer.geometry.simplify(0.001, preserve_topology=True)
+
                     # Convert to KML using geopandas
                     country_layer.to_file(str(temp_kml), driver='KML')
 
@@ -493,115 +509,40 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                 with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
                     zip_ref.extractall(temp_dir)
 
-                # Check for direct shapefiles
-                shp_files = list(Path(temp_dir).glob("*.shp"))
-                if not shp_files:
-                    # Prefer polygons shapefile over points
-                    polygons_shp = None
-                    for shp_file in shp_files:
-                        if 'polygons' in str(shp_file).lower():
-                            polygons_shp = shp_file
-                            break
-                    if not polygons_shp:
-                        polygons_shp = shp_files[0]  # fallback to first one
+                # Force extract all nested ZIP files (WDPA has multiple nested ZIPs)
+                print(f"PREGENERATE: Force extracting all nested ZIP files...")
+                force_extracted_count = 0
+                extracted_zips = set()
 
-                    print(f"PREGENERATE: Reading shapefile {polygons_shp}")
-                    mpa_gdf = gpd.read_file(polygons_shp)
-                    print(f"PREGENERATE: Loaded {len(mpa_gdf)} MPA features")
-                    print(f"PREGENERATE: MPA columns: {list(mpa_gdf.columns)}")
-                else:
-                    print("PREGENERATE: No shapefiles found in extracted ZIP")
+                # Multiple passes to handle deeply nested ZIPs
+                max_passes = 5  # Prevent infinite loops
+                for pass_num in range(max_passes):
+                    found_new_zips = False
+                    for root, dirs, files in os.walk(temp_dir):
+                        for file in files:
+                            if file.lower().endswith('.zip'):
+                                zip_path = os.path.join(root, file)
+                                if zip_path in extracted_zips:
+                                    continue
+                                try:
+                                    with zipfile.ZipFile(zip_path, 'r') as z:
+                                        bad_file = z.testzip()
+                                        if bad_file:
+                                            print(f"PREGENERATE: Skipping corrupted ZIP: {file}")
+                                            continue
+                                        z.extractall(temp_dir)
+                                        force_extracted_count += 1
+                                        extracted_zips.add(zip_path)
+                                        found_new_zips = True
+                                        print(f"PREGENERATE: Extracted nested ZIP (pass {pass_num+1}): {file}")
+                                except Exception as e:
+                                    print(f"PREGENERATE: ZIP extraction failed for {file}: {e}")
+                                    continue
 
-            # Generate country-specific MPA KMLs
-            if mpa_gdf is not None and any(col.lower() == 'iso3' for col in mpa_gdf.columns):
-                # Find the correct column name (case-insensitive)
-                iso3_col = next(col for col in mpa_gdf.columns if col.lower() == 'iso3')
+                    if not found_new_zips:
+                        break  # No more ZIPs found in this pass
 
-                mpa_countries = mpa_gdf[iso3_col].unique()
-                mpa_countries = [c for c in mpa_countries if c and not pd.isna(c)]
-                print(f"PREGENERATE: Found {len(mpa_countries)} countries with MPA data (using column '{iso3_col}')")
-
-                success_count = 0
-                for country_iso in mpa_countries:
-                    try:
-                        country_iso_dir = country_dir / str(country_iso)
-                        country_iso_dir.mkdir(exist_ok=True)
-
-                        country_mpa = mpa_gdf[mpa_gdf[iso3_col] == country_iso]
-                        if not country_mpa.empty:
-                            mpa_kml = country_iso_dir / f"{country_iso}_MPA.kml"
-                            temp_kml = country_iso_dir / f"{country_iso}_MPA_temp.kml"
-
-                            # Clean MPA data
-                            country_mpa = country_mpa[country_mpa.geometry.is_valid & ~country_mpa.geometry.is_empty]
-
-                            # Reduce columns to only essential ones for smaller/faster KML
-                            keep_columns = ['NAME_ENG', 'DESIG_ENG', 'IUCN_CAT', 'STATUS', 'STATUS_YR', 'geometry']
-                            available_columns = [col for col in keep_columns if col in country_mpa.columns]
-                            if available_columns:
-                                country_mpa = country_mpa[available_columns]
-
-                            # Add geometry simplification for smaller/faster files (0.005 degrees ~ 500m at equator)
-                            if len(country_mpa) > 10:  # Only simplify for larger datasets
-                                country_mpa = country_mpa.copy()
-                                country_mpa['geometry'] = country_mpa.geometry.simplify(0.005, preserve_topology=True)
-
-                            # Skip geometry simplification to avoid KeyboardInterrupt - keep original geometries
-                            import time
-                            start_time = time.time()
-
-                            try:
-                                # Create basic KML first (use default geopandas KML driver - no engine parameter)
-                                country_mpa.to_file(str(temp_kml), driver='KML')
-
-                                # Apply desktop MPA styling (red fill)
-                                mpa_color_abgr = "ff0000ff"  # Red with full opacity
-                                if process_kml(str(temp_kml), str(mpa_kml), mpa_color_abgr):
-                                    elapsed = time.time() - start_time
-                                    print(f"PREGENERATE: Generated MPA for {country_iso} ({len(country_mpa)} features) in {elapsed:.1f}s")
-                                    success_count += 1
-                                else:
-                                    print(f"PREGENERATE: Failed to style MPA for {country_iso}")
-
-                                # Clean up temp file
-                                if temp_kml.exists():
-                                    temp_kml.unlink()
-
-                            except Exception as kml_error:
-                                elapsed = time.time() - start_time
-                                print(f"PREGENERATE: Failed to generate MPA KML for {country_iso} after {elapsed:.1f}s: {kml_error}")
-                    except Exception as country_error:
-                        print(f"PREGENERATE: Error processing MPA country {country_iso}: {country_error}")
-                        continue
-
-                print(f"PREGENERATE: MPA processing complete - {success_count}/{len(mpa_countries)} countries succeeded")
-            else:
-                print("PREGENERATE: MPA data not loaded or missing iso3 column")
-
-            # Clean up MPA GeoDataFrame and force garbage collection
-            if 'mpa_gdf' in locals() and mpa_gdf is not None:
-                del mpa_gdf
-            gc.collect()
-
-        except Exception as e:
-            print(f"PREGENERATE: Error processing MPA data: {e}")
-            # Clean up on error too
-            if 'mpa_gdf' in locals() and mpa_gdf is not None:
-                del mpa_gdf
-            gc.collect()
-
-    # Process WDPA data for MPAs
-    wdpa_dir = STATIC_CACHE_DIR / "wdpa"
-    wdpa_files = list(wdpa_dir.glob("*.zip"))
-    if wdpa_files:
-        wdpa_file = wdpa_files[0]
-        print(f"PREGENERATE: Processing MPA data from {wdpa_file}")
-        mpa_gdf = None
-        try:
-            with tempfile.TemporaryDirectory() as temp_dir:
-                print(f"PREGENERATE: Extracting WDPA ZIP to {temp_dir}")
-                with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
-                    zip_ref.extractall(temp_dir)
+                print(f"PREGENERATE: Extracted {force_extracted_count} nested ZIP files total")
 
                 # Check for direct shapefiles
                 shp_files = list(Path(temp_dir).glob("*.shp"))
@@ -712,6 +653,186 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                 print(f"PREGENERATE: Extracting WDPA ZIP to {temp_dir}")
                 with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
                     zip_ref.extractall(temp_dir)
+
+                # Force extract all nested ZIP files (WDPA has multiple nested ZIPs)
+                print(f"PREGENERATE: Force extracting all nested ZIP files...")
+                force_extracted_count = 0
+                extracted_zips = set()
+
+                # Multiple passes to handle deeply nested ZIPs
+                max_passes = 5  # Prevent infinite loops
+                for pass_num in range(max_passes):
+                    found_new_zips = False
+                    for root, dirs, files in os.walk(temp_dir):
+                        for file in files:
+                            if file.lower().endswith('.zip'):
+                                zip_path = os.path.join(root, file)
+                                if zip_path in extracted_zips:
+                                    continue
+                                try:
+                                    with zipfile.ZipFile(zip_path, 'r') as z:
+                                        bad_file = z.testzip()
+                                        if bad_file:
+                                            print(f"PREGENERATE: Skipping corrupted ZIP: {file}")
+                                            continue
+                                        z.extractall(temp_dir)
+                                        force_extracted_count += 1
+                                        extracted_zips.add(zip_path)
+                                        found_new_zips = True
+                                        print(f"PREGENERATE: Extracted nested ZIP (pass {pass_num+1}): {file}")
+                                except Exception as e:
+                                    print(f"PREGENERATE: ZIP extraction failed for {file}: {e}")
+                                    continue
+
+                    if not found_new_zips:
+                        break  # No more ZIPs found in this pass
+
+                print(f"PREGENERATE: Extracted {force_extracted_count} nested ZIP files total")
+
+                # Check for direct shapefiles
+                shp_files = list(Path(temp_dir).glob("*.shp"))
+                if not shp_files:
+                    # Prefer polygons shapefile over points
+                    polygons_shp = None
+                    for shp_file in shp_files:
+                        if 'polygons' in str(shp_file).lower():
+                            polygons_shp = shp_file
+                            break
+                    if not polygons_shp:
+                        polygons_shp = shp_files[0]  # fallback to first one
+
+                    print(f"PREGENERATE: Reading shapefile {polygons_shp}")
+                    mpa_gdf = gpd.read_file(polygons_shp)
+                    print(f"PREGENERATE: Loaded {len(mpa_gdf)} MPA features")
+                    print(f"PREGENERATE: MPA columns: {list(mpa_gdf.columns)}")
+                else:
+                    print("PREGENERATE: No shapefiles found in extracted ZIP")
+
+            # Generate country-specific MPA KMLs
+            if mpa_gdf is not None and any(col.lower() == 'iso3' for col in mpa_gdf.columns):
+                # Find the correct column name (case-insensitive)
+                iso3_col = next(col for col in mpa_gdf.columns if col.lower() == 'iso3')
+
+                mpa_countries = mpa_gdf[iso3_col].unique()
+                mpa_countries = [c for c in mpa_countries if c and not pd.isna(c)]
+                print(f"PREGENERATE: Found {len(mpa_countries)} countries with MPA data (using column '{iso3_col}')")
+
+                success_count = 0
+                for country_iso in mpa_countries:
+                    try:
+                        country_iso_dir = country_dir / str(country_iso)
+                        country_iso_dir.mkdir(exist_ok=True)
+
+                        country_mpa = mpa_gdf[mpa_gdf[iso3_col] == country_iso]
+                        if not country_mpa.empty:
+                            mpa_kml = country_iso_dir / f"{country_iso}_MPA.kml"
+                            temp_kml = country_iso_dir / f"{country_iso}_MPA_temp.kml"
+
+                            # Clean MPA data
+                            country_mpa = country_mpa[country_mpa.geometry.is_valid & ~country_mpa.geometry.is_empty]
+
+                            # Reduce columns to only essential ones for smaller/faster KML
+                            keep_columns = ['NAME_ENG', 'DESIG_ENG', 'IUCN_CAT', 'STATUS', 'STATUS_YR', 'geometry']
+                            available_columns = [col for col in keep_columns if col in country_mpa.columns]
+                            if available_columns:
+                                country_mpa = country_mpa[available_columns]
+
+                            # Add geometry simplification for smaller/faster files (0.005 degrees ~ 500m at equator)
+                            if len(country_mpa) > 10:  # Only simplify for larger datasets
+                                country_mpa = country_mpa.copy()
+                                country_mpa['geometry'] = country_mpa.geometry.simplify(0.005, preserve_topology=True)
+
+                            # Skip geometry simplification to avoid KeyboardInterrupt - keep original geometries
+                            import time
+                            start_time = time.time()
+
+                            try:
+                                # Create basic KML first (use default geopandas KML driver - no engine parameter)
+                                country_mpa.to_file(str(temp_kml), driver='KML')
+
+                                # Apply desktop MPA styling (red fill)
+                                mpa_color_abgr = "ff0000ff"  # Red with full opacity
+                                if process_kml(str(temp_kml), str(mpa_kml), mpa_color_abgr):
+                                    elapsed = time.time() - start_time
+                                    print(f"PREGENERATE: Generated MPA for {country_iso} ({len(country_mpa)} features) in {elapsed:.1f}s")
+                                    success_count += 1
+                                else:
+                                    print(f"PREGENERATE: Failed to style MPA for {country_iso}")
+
+                                # Clean up temp file
+                                if temp_kml.exists():
+                                    temp_kml.unlink()
+
+                            except Exception as kml_error:
+                                elapsed = time.time() - start_time
+                                print(f"PREGENERATE: Failed to generate MPA KML for {country_iso} after {elapsed:.1f}s: {kml_error}")
+                    except Exception as country_error:
+                        print(f"PREGENERATE: Error processing MPA country {country_iso}: {country_error}")
+                        continue
+
+                print(f"PREGENERATE: MPA processing complete - {success_count}/{len(mpa_countries)} countries succeeded")
+            else:
+                print("PREGENERATE: MPA data not loaded or missing iso3 column")
+
+            # Clean up MPA GeoDataFrame and force garbage collection
+            if 'mpa_gdf' in locals() and mpa_gdf is not None:
+                del mpa_gdf
+            gc.collect()
+
+        except Exception as e:
+            print(f"PREGENERATE: Error processing MPA data: {e}")
+            # Clean up on error too
+            if 'mpa_gdf' in locals() and mpa_gdf is not None:
+                del mpa_gdf
+            gc.collect()
+
+    # Process WDPA data for MPAs
+    wdpa_dir = STATIC_CACHE_DIR / "wdpa"
+    wdpa_files = list(wdpa_dir.glob("*.zip"))
+    if wdpa_files:
+        wdpa_file = wdpa_files[0]
+        print(f"PREGENERATE: Processing MPA data from {wdpa_file}")
+        mpa_gdf = None
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                print(f"PREGENERATE: Extracting WDPA ZIP to {temp_dir}")
+                with zipfile.ZipFile(wdpa_file, 'r') as zip_ref:
+                    zip_ref.extractall(temp_dir)
+
+                # Force extract all nested ZIP files (WDPA has multiple nested ZIPs)
+                print(f"PREGENERATE: Force extracting all nested ZIP files...")
+                force_extracted_count = 0
+                extracted_zips = set()
+
+                # Multiple passes to handle deeply nested ZIPs
+                max_passes = 5  # Prevent infinite loops
+                for pass_num in range(max_passes):
+                    found_new_zips = False
+                    for root, dirs, files in os.walk(temp_dir):
+                        for file in files:
+                            if file.lower().endswith('.zip'):
+                                zip_path = os.path.join(root, file)
+                                if zip_path in extracted_zips:
+                                    continue
+                                try:
+                                    with zipfile.ZipFile(zip_path, 'r') as z:
+                                        bad_file = z.testzip()
+                                        if bad_file:
+                                            print(f"PREGENERATE: Skipping corrupted ZIP: {file}")
+                                            continue
+                                        z.extractall(temp_dir)
+                                        force_extracted_count += 1
+                                        extracted_zips.add(zip_path)
+                                        found_new_zips = True
+                                        print(f"PREGENERATE: Extracted nested ZIP (pass {pass_num+1}): {file}")
+                                except Exception as e:
+                                    print(f"PREGENERATE: ZIP extraction failed for {file}: {e}")
+                                    continue
+
+                    if not found_new_zips:
+                        break  # No more ZIPs found in this pass
+
+                print(f"PREGENERATE: Extracted {force_extracted_count} nested ZIP files total")
 
                 # Check for direct shapefiles
                 shp_files = list(Path(temp_dir).glob("*.shp"))
@@ -935,7 +1056,7 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                     name = properties.get('title', f'NAV WARNING {i+1}')
                     description = properties.get('description', 'Navigation warning')
 
-                    # Format description with HTML and escape for XML
+                    # Format description with HTML wrapped in CDATA for valid XML
                     import html
                     safe_name = html.escape(name)
                     safe_description = html.escape(description.replace('\n', '<br>'))
@@ -947,6 +1068,9 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                     html_desc += f"<b>Source:</b> {html.escape(properties.get('source', 'NGA MSI'))}<br><br>"
                     html_desc += safe_description
 
+                    # Wrap in CDATA for valid XML
+                    xml_desc = f"<![CDATA[{html_desc}]]>"
+
                     geom_type = geometry.get('type', '')
                     coordinates = geometry.get('coordinates', [])
 
@@ -956,7 +1080,7 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                         kml_content += f"""
     <Placemark>
       <name>{name}</name>
-      <description>{html_desc}</description>
+      <description>{xml_desc}</description>
       <styleUrl>#navWarningStyle</styleUrl>
       <Point>
         <coordinates>{lon},{lat},0</coordinates>
@@ -969,7 +1093,7 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                         kml_content += f"""
     <Placemark>
       <name>{name}</name>
-      <description>{html_desc}</description>
+      <description>{xml_desc}</description>
       <styleUrl>#navWarningStyle</styleUrl>
       <LineString>
         <coordinates>{coord_str}</coordinates>
@@ -984,7 +1108,7 @@ def pregenerate_default_kmls(force_regeneration=False, changed_layers=None):
                             kml_content += f"""
     <Placemark>
       <name>{name}</name>
-      <description>{html_desc}</description>
+      <description>{xml_desc}</description>
       <styleUrl>#navWarningStyle</styleUrl>
       <Polygon>
         <outerBoundaryIs>
